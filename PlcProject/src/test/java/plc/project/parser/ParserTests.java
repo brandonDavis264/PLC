@@ -241,6 +241,39 @@ final class ParserTests {
                         new Ast.Stmt.Let("name", Optional.empty())
                 ),
 
+                Arguments.of("Declaration with incorrect type format",
+                        new Input.Tokens(List.of(
+                                new Token(Token.Type.IDENTIFIER, "LET"),
+                                new Token(Token.Type.IDENTIFIER, "name"),
+                                new Token(Token.Type.OPERATOR, "#"),
+                                new Token(Token.Type.IDENTIFIER, "Indent"),
+                                new Token(Token.Type.OPERATOR, ";")
+                        )),
+                        null
+                ),
+
+                Arguments.of("Declaration with not right type",
+                        new Input.Tokens(List.of(
+                                new Token(Token.Type.IDENTIFIER, "LET"),
+                                new Token(Token.Type.IDENTIFIER, "name"),
+                                new Token(Token.Type.OPERATOR, ":"),
+                                new Token(Token.Type.OPERATOR, "#"),
+                                new Token(Token.Type.OPERATOR, ";")
+                        )),
+                        null
+                ),
+
+                Arguments.of("Declaration with type",
+                        new Input.Tokens(List.of(
+                                new Token(Token.Type.IDENTIFIER, "LET"),
+                                new Token(Token.Type.IDENTIFIER, "name"),
+                                new Token(Token.Type.OPERATOR, ":"),
+                                new Token(Token.Type.IDENTIFIER, "Identifier"),
+                                new Token(Token.Type.OPERATOR, ";")
+                        )),
+                        new Ast.Stmt.Let("name", Optional.of("Identifier"),Optional.empty())
+                ),
+
                 // Test for a valid initialization with an expression
                 Arguments.of("Initialization",
                         new Input.Tokens(List.of(
@@ -251,6 +284,46 @@ final class ParserTests {
                                 new Token(Token.Type.OPERATOR, ";")
                         )),
                         new Ast.Stmt.Let("name", Optional.of(new Ast.Expr.Variable("expr")))
+                ),
+
+                Arguments.of("Intialization with incorrect type format",
+                        new Input.Tokens(List.of(
+                                new Token(Token.Type.IDENTIFIER, "LET"),
+                                new Token(Token.Type.IDENTIFIER, "name"),
+                                new Token(Token.Type.OPERATOR, "#"),
+                                new Token(Token.Type.IDENTIFIER, "Indent"),
+                                new Token(Token.Type.OPERATOR, "="),
+                                new Token(Token.Type.IDENTIFIER, "Ident"),
+                                new Token(Token.Type.OPERATOR, ";")
+                        )),
+                        null
+                ),
+
+                Arguments.of("Intialization  with not right type",
+                        new Input.Tokens(List.of(
+                                new Token(Token.Type.IDENTIFIER, "LET"),
+                                new Token(Token.Type.IDENTIFIER, "name"),
+                                new Token(Token.Type.OPERATOR, ":"),
+                                new Token(Token.Type.OPERATOR, "#"),
+                                new Token(Token.Type.OPERATOR, "="),
+                                new Token(Token.Type.IDENTIFIER, "Ident"),
+                                new Token(Token.Type.OPERATOR, ";")
+                        )),
+                        null
+                ),
+
+                Arguments.of("Intialization  with type",
+                        new Input.Tokens(List.of(
+                                new Token(Token.Type.IDENTIFIER, "LET"),
+                                new Token(Token.Type.IDENTIFIER, "name"),
+                                new Token(Token.Type.OPERATOR, ":"),
+                                new Token(Token.Type.IDENTIFIER, "Identifier"),
+                                new Token(Token.Type.OPERATOR, "="),
+                                new Token(Token.Type.IDENTIFIER, "Ident"),
+                                new Token(Token.Type.OPERATOR, ";")
+
+                        )),
+                        new Ast.Stmt.Let("name", Optional.of("Identifier"), Optional.of(new Ast.Expr.Variable("Ident")))
                 ),
 
                 // Test for a missing semicolon, which should result in a ParseException
@@ -326,6 +399,137 @@ final class ParserTests {
                                 new Token(Token.Type.IDENTIFIER, "END")
                         )),
                         new Ast.Stmt.Def("name", List.of(), List.of())
+                ),
+                //Return Type
+                Arguments.of("Return Type",
+                        new Input.Tokens(List.of(
+                                new Token(Token.Type.IDENTIFIER, "DEF"),
+                                new Token(Token.Type.IDENTIFIER, "name"),
+                                new Token(Token.Type.OPERATOR, "("),
+                                new Token(Token.Type.OPERATOR, ")"),
+                                new Token(Token.Type.OPERATOR, ":"),
+                                new Token(Token.Type.IDENTIFIER, "identifier"),
+                                new Token(Token.Type.IDENTIFIER, "DO"),
+                                new Token(Token.Type.IDENTIFIER, "END")
+                        )),
+                        new Ast.Stmt.Def("name", List.of(), List.of(), Optional.of("identifier"), List.of())
+                ),
+                //incorrect Return Type
+                Arguments.of("Incorrect Return Type",
+                        new Input.Tokens(List.of(
+                                new Token(Token.Type.IDENTIFIER, "DEF"),
+                                new Token(Token.Type.IDENTIFIER, "name"),
+                                new Token(Token.Type.OPERATOR, "("),
+                                new Token(Token.Type.OPERATOR, ")"),
+                                new Token(Token.Type.OPERATOR, ":"),
+                                new Token(Token.Type.OPERATOR, "$"),
+                                new Token(Token.Type.IDENTIFIER, "DO"),
+                                new Token(Token.Type.IDENTIFIER, "END")
+                        )),
+                        null
+                ),
+                //incorrect Return Type SYNTAX
+                Arguments.of("Incorrect SYNTAX Return Type",
+                        new Input.Tokens(List.of(
+                                new Token(Token.Type.IDENTIFIER, "DEF"),
+                                new Token(Token.Type.IDENTIFIER, "name"),
+                                new Token(Token.Type.OPERATOR, "("),
+                                new Token(Token.Type.OPERATOR, ")"),
+                                new Token(Token.Type.OPERATOR, "%"),
+                                new Token(Token.Type.IDENTIFIER, "IDENTIFIER"),
+                                new Token(Token.Type.IDENTIFIER, "DO"),
+                                new Token(Token.Type.IDENTIFIER, "END")
+                        )),
+                        null
+                ),
+                //Incorretct parameter
+                Arguments.of("Incorrect Parameter",
+                        new Input.Tokens(List.of(
+                                new Token(Token.Type.IDENTIFIER, "DEF"),
+                                new Token(Token.Type.IDENTIFIER, "name"),
+                                new Token(Token.Type.OPERATOR, "("),
+                                new Token(Token.Type.OPERATOR, "#"),
+                                new Token(Token.Type.OPERATOR, ")"),
+                                new Token(Token.Type.IDENTIFIER, "DO"),
+                                new Token(Token.Type.IDENTIFIER, "END")
+                        )),
+                        null
+                ),
+
+                //Parameter with type
+                Arguments.of("Parameter type",
+                        new Input.Tokens(List.of(
+                                new Token(Token.Type.IDENTIFIER, "DEF"),
+                                new Token(Token.Type.IDENTIFIER, "name"),
+                                new Token(Token.Type.OPERATOR, "("),
+                                new Token(Token.Type.IDENTIFIER, "parameter"),
+                                new Token(Token.Type.OPERATOR, ":"),
+                                new Token(Token.Type.IDENTIFIER, "identifier"),
+                                new Token(Token.Type.OPERATOR, ")"),
+                                new Token(Token.Type.IDENTIFIER, "DO"),
+                                new Token(Token.Type.IDENTIFIER, "END")
+                        )),
+                        new Ast.Stmt.Def("name", List.of("parameter"), List.of(Optional.of("identifier")), Optional.empty(), List.of())
+                ),
+
+                //Parameters with types
+                Arguments.of("multiple Parameter type",
+                        new Input.Tokens(List.of(
+                                new Token(Token.Type.IDENTIFIER, "DEF"),
+                                new Token(Token.Type.IDENTIFIER, "name"),
+                                new Token(Token.Type.OPERATOR, "("),
+                                new Token(Token.Type.IDENTIFIER, "parameter1"),
+                                new Token(Token.Type.OPERATOR, ":"),
+                                new Token(Token.Type.IDENTIFIER, "identifier"),
+                                new Token(Token.Type.IDENTIFIER, "parameter2"),
+                                new Token(Token.Type.IDENTIFIER, "parameter3"),
+                                new Token(Token.Type.OPERATOR, ":"),
+                                new Token(Token.Type.IDENTIFIER, "identifier"),
+                                new Token(Token.Type.OPERATOR, ")"),
+                                new Token(Token.Type.IDENTIFIER, "DO"),
+                                new Token(Token.Type.IDENTIFIER, "END")
+                        )),
+                        new Ast.Stmt.Def("name", List.of("parameter1", "parameter2", "parameter3"), List.of(Optional.of("identifier"), Optional.of("identifier")), Optional.empty(), List.of())
+                ),
+
+                //Parameters with incorrect types
+                Arguments.of("inccorect Parameter type",
+                        new Input.Tokens(List.of(
+                                new Token(Token.Type.IDENTIFIER, "DEF"),
+                                new Token(Token.Type.IDENTIFIER, "name"),
+                                new Token(Token.Type.OPERATOR, "("),
+                                new Token(Token.Type.IDENTIFIER, "parameter1"),
+                                new Token(Token.Type.OPERATOR, ":"),
+                                new Token(Token.Type.OPERATOR, "i"),
+                                new Token(Token.Type.IDENTIFIER, "parameter2"),
+                                new Token(Token.Type.IDENTIFIER, "parameter3"),
+                                new Token(Token.Type.OPERATOR, ":"),
+                                new Token(Token.Type.IDENTIFIER, "identifier"),
+                                new Token(Token.Type.OPERATOR, ")"),
+                                new Token(Token.Type.IDENTIFIER, "DO"),
+                                new Token(Token.Type.IDENTIFIER, "END")
+                        )),
+                        null
+                ),
+
+                //Parameter inccorect Type syntax
+                Arguments.of("Incorrect Parameter type Syntax",
+                        new Input.Tokens(List.of(
+                                new Token(Token.Type.IDENTIFIER, "DEF"),
+                                new Token(Token.Type.IDENTIFIER, "name"),
+                                new Token(Token.Type.OPERATOR, "("),
+                                new Token(Token.Type.IDENTIFIER, "parameter1"),
+                                new Token(Token.Type.OPERATOR, "#"),
+                                new Token(Token.Type.IDENTIFIER, "i"),
+                                new Token(Token.Type.IDENTIFIER, "parameter2"),
+                                new Token(Token.Type.IDENTIFIER, "parameter3"),
+                                new Token(Token.Type.OPERATOR, ":"),
+                                new Token(Token.Type.IDENTIFIER, "identifier"),
+                                new Token(Token.Type.OPERATOR, ")"),
+                                new Token(Token.Type.IDENTIFIER, "DO"),
+                                new Token(Token.Type.IDENTIFIER, "END")
+                        )),
+                        null
                 ),
 
                 // Test for a function definition with one parameter
@@ -1294,6 +1498,16 @@ final class ParserTests {
                                 new Token(Token.Type.OPERATOR, ")")
                         )),
                         new Ast.Expr.Function("function", List.of())
+                ),
+                Arguments.of("Missing Comma",
+                        new Input.Tokens(List.of(
+                                new Token(Token.Type.IDENTIFIER, "function"),
+                                new Token(Token.Type.OPERATOR, "("),
+                                new Token(Token.Type.IDENTIFIER, "f"),
+                                new Token(Token.Type.IDENTIFIER, "f"),
+                                new Token(Token.Type.OPERATOR, ")")
+                        )),
+                        null
                 ),
                 Arguments.of("Argument",
                         new Input.Tokens(List.of(

@@ -59,10 +59,17 @@ public final class Parser {
     private Ast.Stmt.Let parseLetStmt() throws ParseException {
         //let_stmt ::= 'LET' identifier ('=' expr)? ';'
         Optional<Ast.Expr> exp = Optional.empty();
+        Optional<String> type = Optional.empty();
         tokens.match("LET");
         if(tokens.match(Token.Type.IDENTIFIER)){
             var name = tokens.get(-1).literal();
-
+            if(tokens.match(":")){
+                if(!tokens.match(Token.Type.IDENTIFIER)){
+                    throw new ParseException("Parser Error in LET statement: Expected \"Identifier\" found: "
+                            + (tokens.has(0) ? tokens.get(-2).literal() : "Empty" + tokens.get(-1).literal()));
+                }
+                type = Optional.of(tokens.get(-1).literal());
+            }
             if(!tokens.peek(";")) {
                 if (tokens.match("=") && !tokens.peek(";")) {
                     exp = Optional.of(parseExpr());
@@ -76,7 +83,7 @@ public final class Parser {
                         + (tokens.has(0) ? tokens.get(-1).literal() : "Empty"));
             }
 
-            return new Ast.Stmt.Let(name, exp);
+            return new Ast.Stmt.Let(name, type, exp);
         }else{
             throw new ParseException("Parser Error in LET statement: Expected \"Indentifier\" found: "
                     + (tokens.has(0) ? tokens.get(-1).literal() : "Empty"));
@@ -85,6 +92,8 @@ public final class Parser {
 
     private Ast.Stmt.Def parseDefStmt() throws ParseException {
         //def_stmt ::= 'DEF' identifier '(' (identifier (',' identifier)*)? ')' 'DO' stmt* 'END'
+        List<Optional<String>> pramaTypes = new ArrayList<>();
+        Optional<String> returnType = Optional.empty();
         tokens.match("DEF");
         if(tokens.match(Token.Type.IDENTIFIER)){
             var name = tokens.get(-1).literal();
@@ -97,6 +106,14 @@ public final class Parser {
                     if (tokens.match(Token.Type.IDENTIFIER)) {
                         var agrument = tokens.get(-1).literal();
                         args.add(agrument);
+                        //Param Type
+                        if(tokens.match(":")){
+                            if(!tokens.match(Token.Type.IDENTIFIER)){
+                                throw new ParseException("Parser Error in Def statement: Expected \"Identifier\" found: "
+                                        + (tokens.has(0) ? tokens.get(-2).literal() : "Empty" + tokens.get(-1).literal()));
+                            }
+                            pramaTypes.add(Optional.of(tokens.get(-1).literal()));
+                        }
                         //if we Match a ',' and peek for a ')'
                         if (tokens.match(",") && tokens.peek(")")) {
                             //Throw an error
@@ -104,12 +121,23 @@ public final class Parser {
                                     + (tokens.has(0) ? tokens.get(-1).literal() : "Empty"));
 
                         }
-                    }
+                    }else
+                        throw new ParseException("Parser Error: Expected Argument found: "
+                                + (tokens.has(0) ? tokens.get(-1).literal() : "Empty"));
                 }
             }else
                 //Throw an error
                 throw new ParseException("Parser Error: Expected '(' found: "
                         + (tokens.has(0) ? tokens.get(-1).literal() : "Empty"));
+
+            //Return Type
+            if(tokens.match(":")){
+                if(!tokens.match(Token.Type.IDENTIFIER)){
+                    throw new ParseException("Parser Error in Def statement: Expected \"Identifier\" found: "
+                            + (tokens.has(0) ? tokens.get(-2).literal() : "Empty" + tokens.get(-1).literal()));
+                }
+                returnType = Optional.of(tokens.get(-1).literal());
+            }
 
             if (tokens.match("DO")) {
                 while (!tokens.match("END"))
@@ -118,7 +146,7 @@ public final class Parser {
                 throw new ParseException("Parser Error in DEF statement: Expected \"DO\" found: "
                         + (tokens.has(0) ? tokens.get(-1).literal() : "Empty"));
 
-            return new Ast.Stmt.Def(name, args, statements);
+            return new Ast.Stmt.Def(name, args, pramaTypes, returnType, statements);
         }else
             throw new ParseException("Parser Error in DEF statement: Expected \"Indentifier\" found: "
                     + (tokens.has(0) ? tokens.get(-1).literal() : "Empty"));
@@ -295,6 +323,9 @@ public final class Parser {
                         //Parse an Argument
                         var agrument = parseExpr();
                         args.add(agrument);
+
+                        //BAD SEEMS LIKE THIS IS GOING TO BE A LLOOOOOONNNG DEBUGGING SECTION HERE :/
+
                         //if we Match a ',' and peek for a ')'
                         if(tokens.match(",") && tokens.peek(")")) {
                             //Throw an error
@@ -466,11 +497,12 @@ public final class Parser {
                 var agrument = parseExpr();
                 args.add(agrument);
                 //if we Match a ',' and peek for a ')'
-                if(tokens.match(",") && tokens.peek(")")) {
+                if(tokens.peek(",", ")") || !tokens.match(",") && !tokens.peek(")") ) {
                     //Throw an error
                     throw new ParseException("Parser Error: Expected Argument found: "
                             + (tokens.has(0) ? tokens.get(-1).literal() : "Empty"));
                 }
+
             }
             return new Ast.Expr.Function(name, args);
         }
