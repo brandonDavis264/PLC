@@ -22,16 +22,29 @@ public sealed interface Type {
     Primitive ITERABLE = new Primitive("Iterable");
 
     record Primitive(
-        String name
+            String name
     ) implements Type {}
 
     record Function(
-        List<Type> parameters,
-        Type returns
+            List<Type> parameters,
+            Type returns
     ) implements Type {}
 
     record Object(
-        Scope scope
-    ) implements Type {}
+            Scope scope
+    ) implements Type {
+
+        @Override
+        public boolean equals(java.lang.Object obj) {
+            return obj instanceof Object other
+                    && scope.collect(true).equals(other.scope.collect(true));
+        }
+
+        @Override
+        public String toString() {
+            return "Object[fields=" + scope.collect(true) + "]";
+        }
+
+    }
 
 }

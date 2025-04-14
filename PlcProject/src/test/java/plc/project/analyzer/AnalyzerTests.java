@@ -347,21 +347,20 @@ final class AnalyzerTests {
     private static Stream<Arguments> testExpressionStmt() {
         return Stream.of(
             Arguments.of("Literal",
-                new Input.Ast(new Ast.Source(List.of(
-                    new Ast.Stmt.Expression(new Ast.Expr.Literal("literal"))
-                ))),
-                new Ir.Source(List.of(
-                    new Ir.Stmt.Expression(new Ir.Expr.Literal("literal", Type.STRING))
-                )),
-                List.of()
+                    new Input.Ast(new Ast.Source(List.of(
+                            new Ast.Stmt.Expression(new Ast.Expr.Literal("literal"))
+                    ))),
+                    new Ir.Source(List.of(
+                            new Ir.Stmt.Expression(new Ir.Expr.Literal("literal", Type.STRING))
+                    ))
             ),
             Arguments.of("Variable",
-                new Input.Ast(new Ast.Source(List.of(
-                    new Ast.Stmt.Expression(new Ast.Expr.Variable("variable"))
-                ))),
-                new Ir.Source(List.of(
-                    new Ir.Stmt.Expression(new Ir.Expr.Variable("variable", Type.STRING))
-                ))
+                    new Input.Ast(new Ast.Source(List.of(
+                            new Ast.Stmt.Expression(new Ast.Expr.Variable("variable"))
+                    ))),
+                    new Ir.Source(List.of(
+                            new Ir.Stmt.Expression(new Ir.Expr.Variable("variable", Type.STRING))
+                    ))
             )
         );
     }
