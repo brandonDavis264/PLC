@@ -167,6 +167,30 @@ final class AnalyzerTests {
                     )),
                     new Ir.Stmt.Expression(new Ir.Expr.Function("name", List.of(), Type.STRING))
                 ))
+            ),
+            Arguments.of("Undefined Property Type",
+                    new Input.Ast(new Ast.Source(List.of(
+                            new Ast.Stmt.Def(
+                                    "name",
+                                    List.of("property"),
+                                    List.of(Optional.of("Undefined")),
+                                    Optional.empty(),
+                                    List.of()
+                            )
+                    ))),
+                    null // AnalyzeException (Undefined type for property)
+            ),
+            Arguments.of("Undefined Return Type",
+                    new Input.Ast(new Ast.Source(List.of(
+                            new Ast.Stmt.Def(
+                                    "name",
+                                    List.of(),
+                                    List.of(),
+                                    Optional.of("Undefined"),
+                                    List.of()
+                            )
+                    ))),
+                    null // AnalyzeException (Undefined return type for function)
             )
         );
     }
@@ -208,6 +232,22 @@ final class AnalyzerTests {
                         List.of(new Ir.Stmt.Let("name", Type.ANY, Optional.empty()))
                     )
                 ))
+            ),
+            Arguments.of("Else",
+                    new Input.Ast(new Ast.Source(List.of(
+                            new Ast.Stmt.If(
+                                    new Ast.Expr.Literal(true),
+                                    List.of(),
+                                    List.of(new Ast.Stmt.Expression(new Ast.Expr.Literal("else")))
+                            )
+                    ))),
+                    new Ir.Source(List.of(
+                            new Ir.Stmt.If(
+                                    new Ir.Expr.Literal(true, Type.BOOLEAN),
+                                    List.of(),
+                                    List.of(new Ir.Stmt.Expression(new Ir.Expr.Literal("else", Type.STRING)))
+                            )
+                    ))
             )
         );
     }
@@ -242,6 +282,16 @@ final class AnalyzerTests {
                         List.of(new Ir.Stmt.Expression(new Ir.Expr.Variable("element", Type.INTEGER)))
                     )
                 ))
+            ),
+            Arguments.of("Invalid Expression Type",
+                    new Input.Ast(new Ast.Source(List.of(
+                            new Ast.Stmt.For(
+                                    "name",
+                                    new Ast.Expr.Literal(new BigInteger("1")), // Invalid type (expected iterable or range)
+                                    List.of(new Ast.Stmt.Expression(new Ast.Expr.Variable("name")))
+                            )
+                    ))),
+                    null // AnalyzeException due to invalid expression type (expected iterable or range, got Integer)
             )
         );
     }
@@ -274,7 +324,17 @@ final class AnalyzerTests {
                     new Ast.Stmt.Return(Optional.empty())
                 ))),
                 null //AnalyzeException
+            ),
+            Arguments.of("Invalid Value Type",
+                    new Input.Ast(new Ast.Source(List.of(
+                            new Ast.Stmt.Def("name", List.of(), List.of(), Optional.of("String"), List.of(
+                                    new Ast.Stmt.Return(Optional.of(new Ast.Expr.Literal(new BigInteger("1"))))
+                            )),
+                            new Ast.Stmt.Expression(new Ast.Expr.Function("name", List.of()))
+                    ))),
+                    null // AnalyzeException due to type mismatch (expected String, got Integer)
             )
+
         );
     }
 
@@ -328,13 +388,35 @@ final class AnalyzerTests {
                     new Ir.Stmt.Assignment.Variable(new Ir.Expr.Variable("variable", Type.STRING), new Ir.Expr.Literal("value", Type.STRING))
                 ))
             ),
-            Arguments.of("Variable Type Subtype",
+            Arguments.of("Variable Type Invalid",
                 new Input.Ast(new Ast.Source(List.of(
                     new Ast.Stmt.Assignment(new Ast.Expr.Variable("variable"), new Ast.Expr.Literal(null))
                 ))),
                 null //AnalyzeException
+            ),
+            Arguments.of("Property",
+                    new Input.Ast(new Ast.Source(List.of(
+                            new Ast.Stmt.Assignment(
+                                    new Ast.Expr.Property(
+                                            new Ast.Expr.Variable("object"),
+                                            "property"
+                                    ),
+                                    new Ast.Expr.Literal("value")
+                            )
+                    ))),
+                    new Ir.Source(List.of(
+                            new Ir.Stmt.Assignment.Property(
+                                    new Ir.Expr.Property(
+                                            new Ir.Expr.Variable("object", Environment.scope().get("object", true).get()),
+                                            "property",
+                                            Type.STRING
+                                    ),
+                                    new Ir.Expr.Literal("value", Type.STRING)
+                            )
+                    ))
             )
-        );
+
+            );
     }
 
     @ParameterizedTest
@@ -362,6 +444,12 @@ final class AnalyzerTests {
                     new Ast.Expr.Literal("string")
                 ),
                 new Ir.Expr.Literal("string", Type.STRING)
+            ),
+            Arguments.of("NIL",
+                    new Input.Ast(
+                            new Ast.Expr.Literal(null)
+                    ),
+                    new Ir.Expr.Literal(null, Type.NIL)
             )
         );
     }
@@ -379,8 +467,27 @@ final class AnalyzerTests {
                     new Ast.Expr.Group(new Ast.Expr.Literal("expr"))
                 ),
                 new Ir.Expr.Group(new Ir.Expr.Literal("expr", Type.STRING))
+            ),
+            Arguments.of("Nested",
+                    new Input.Ast(
+                            new Ast.Expr.Group(
+                                    new Ast.Expr.Group(
+                                            new Ast.Expr.Group(
+                                                    new Ast.Expr.Literal("expr")
+                                            )
+                                    )
+                            )
+                    ),
+                    new Ir.Expr.Group(
+                            new Ir.Expr.Group(
+                                    new Ir.Expr.Group(
+                                            new Ir.Expr.Literal("expr", Type.STRING)
+                                    )
+                            )
+                    )
             )
-        );
+
+            );
     }
 
     @ParameterizedTest
@@ -480,6 +587,90 @@ final class AnalyzerTests {
                     )
                 ),
                 null //AnalyzeException
+            ),
+            Arguments.of("Op== Equatable Left",
+                    new Input.Ast(
+                            new Ast.Expr.Binary(
+                                    "==",
+                                    new Ast.Expr.Variable("equatable"),
+                                    new Ast.Expr.Variable("equatable")
+                            )
+                    ),
+                    new Ir.Expr.Binary(
+                            "==",
+                            new Ir.Expr.Variable("equatable", Type.EQUATABLE),  // Assuming Type.EQUATABLE exists
+                            new Ir.Expr.Variable("equatable", Type.EQUATABLE),
+                            Type.BOOLEAN
+                    )
+            ),
+
+            Arguments.of("Op== Equatable Subtype Left",
+                    new Input.Ast(
+                            new Ast.Expr.Binary(
+                                    "==",
+                                    new Ast.Expr.Literal(new BigInteger("1")),
+                                    new Ast.Expr.Variable("equatable")
+                            )
+                    ),
+                    new Ir.Expr.Binary(
+                            "==",
+                            new Ir.Expr.Literal(new BigInteger("1"), Type.INTEGER),
+                            new Ir.Expr.Variable("equatable", Type.EQUATABLE),
+                            Type.BOOLEAN
+                    )
+            ),
+
+                Arguments.of("Op== Equatable Subtype Left",
+                        new Input.Ast(
+                                new Ast.Expr.Binary(
+                                        "==",
+                                        new Ast.Expr.Variable("equatable"),
+                                        new Ast.Expr.Literal(new BigInteger("1"))
+                                )
+                        ),
+                        new Ir.Expr.Binary(
+                                "==",
+                                new Ir.Expr.Variable("equatable", Type.EQUATABLE),
+                                new Ir.Expr.Literal(new BigInteger("1"), Type.INTEGER),
+                                Type.BOOLEAN
+                        )
+                ),
+            Arguments.of("Op== Invalid Left Type",
+                    new Input.Ast(
+                            new Ast.Expr.Binary(
+                                    "==",
+                                    new Ast.Expr.Variable("object"),
+                                    new Ast.Expr.Variable("equatable")
+                            )
+                    ),
+                    null // AnalyzeException (Invalid left type: object cannot be equated with equatable)
+            ),
+
+            Arguments.of("Op== Different Equatable Right",
+                    new Input.Ast(
+                            new Ast.Expr.Binary(
+                                    "==",
+                                    new Ast.Expr.Literal(new BigInteger("1")),
+                                    new Ast.Expr.Literal(new BigDecimal("2.0"))
+                            )
+                    ),
+                    new Ir.Expr.Binary(
+                            "==",
+                            new Ir.Expr.Literal(new BigInteger("1"), Type.INTEGER),
+                            new Ir.Expr.Literal(new BigDecimal("2.0"), Type.DECIMAL),
+                            Type.BOOLEAN
+                    )
+            ),
+
+            Arguments.of("Op== Invalid Right Type",
+                    new Input.Ast(
+                            new Ast.Expr.Binary(
+                                    "==",
+                                    new Ast.Expr.Variable("equatable"),
+                                    new Ast.Expr.Variable("object")
+                            )
+                    ),
+                    null // AnalyzeException (Invalid right type: object cannot be equated with equatable)
             )
         );
     }
@@ -527,6 +718,25 @@ final class AnalyzerTests {
                     "property",
                     Type.STRING
                 )
+            ),
+            Arguments.of("Invalid Receiver Type",
+                    new Input.Ast(
+                            new Ast.Expr.Property(
+                                    new Ast.Expr.Variable("any"),
+                                    "property"
+                            )
+                    ),
+                    null // Should throw AnalyzeException
+            ),
+
+            Arguments.of("Undefined Property",
+                    new Input.Ast(
+                            new Ast.Expr.Property(
+                                    new Ast.Expr.Variable("object"),
+                                    "undefined"
+                            )
+                    ),
+                    null // Should throw AnalyzeException
             )
         );
     }
@@ -556,6 +766,27 @@ final class AnalyzerTests {
                     new Ast.Expr.Function("undefined", List.of())
                 ),
                 null //AnalyzeException
+            ),
+            Arguments.of("Invalid Argument Type",
+                    new Input.Ast(
+                            new Ast.Expr.Function("functionString", List.of(new Ast.Expr.Literal(new BigInteger("1"))))
+                    ),
+                    null // AnalyzeException expected due to argument type mismatch
+            ),
+            Arguments.of("Missing Argument",
+                    new Input.Ast(
+                            new Ast.Expr.Function("functionAny", List.of())
+                    ),
+                    null
+            ),
+            Arguments.of("Extraneous Argument",
+                    new Input.Ast(
+                            new Ast.Expr.Function("functionAny", List.of(
+                                    new Ast.Expr.Literal(new BigInteger("1")),
+                                    new Ast.Expr.Literal(new BigInteger("2"))
+                            ))
+                    ),
+                    null
             )
         );
     }
@@ -581,6 +812,31 @@ final class AnalyzerTests {
                     "methodAny",
                     List.of(new Ir.Expr.Literal("argument", Type.STRING)),
                     Type.ANY
+                ),
+                Arguments.of("Invalid Receiver",
+                        new Input.Ast(
+                                new Ast.Expr.Method(
+                                        new Ast.Expr.Literal(1),
+                                        "method",
+                                        List.of()
+                                )
+                        ),
+                        null // should throw AnalyzeException (e.g., requireSubtype fails)
+                ),
+                Arguments.of("Argument",
+                        new Input.Ast(
+                                new Ast.Expr.Method(
+                                        new Ast.Expr.Variable("object"),
+                                        "methodAny",
+                                        List.of(new Ast.Expr.Literal("argument"))
+                                )
+                        ),
+                        new Ir.Expr.Method(
+                                new Ir.Expr.Variable("object", Environment.scope().get("object", true).get()),
+                                "methodAny",
+                                List.of(new Ir.Expr.Literal("argument", Type.STRING)),
+                                Type.ANY
+                        )
                 )
             )
         );
@@ -662,6 +918,66 @@ final class AnalyzerTests {
                     "method",
                     List.of(),
                     Type.ANY
+                ),
+                Arguments.of("Duplicate Field",
+                        new Input.Ast(
+                                new Ast.Expr.ObjectExpr(
+                                        Optional.empty(),
+                                        List.of(
+                                                new Ast.Stmt.Let("name", Optional.empty()),
+                                                new Ast.Stmt.Let("name", Optional.empty())
+                                        ),
+                                        List.of()
+                                )
+                        ),
+                        null // Expect AnalyzeException
+                ),
+                Arguments.of("Method This",
+                        new Input.Ast(
+                                new Ast.Expr.Method(
+                                        new Ast.Expr.ObjectExpr(
+                                                Optional.empty(),
+                                                List.of(new Ast.Stmt.Let("name", Optional.empty())),
+                                                List.of(new Ast.Stmt.Def(
+                                                        "method",
+                                                        List.of(),
+                                                        List.of(new Ast.Stmt.Expression(
+                                                                new Ast.Expr.Property(
+                                                                        new Ast.Expr.Variable("this"), // ← updated from Access to Property(Variable, name)
+                                                                        "name"
+                                                                )
+                                                        ))
+                                                ))
+                                        ),
+                                        "method",
+                                        List.of()
+                                )
+                        ),
+                        new Ir.Expr.Method(
+                                new Ir.Expr.ObjectExpr(
+                                        Optional.empty(),
+                                        List.of(new Ir.Stmt.Let("name", Type.ANY, Optional.empty())),
+                                        List.of(new Ir.Stmt.Def(
+                                                "method",
+                                                List.of(),
+                                                Type.ANY,
+                                                List.of(new Ir.Stmt.Expression(
+                                                        new Ir.Expr.Property(
+                                                                new Ir.Expr.Variable("this", new Type.Object(new Scope(null))), // assuming you reconstruct 'this' type here
+                                                                "name",
+                                                                Type.ANY
+                                                        )
+                                                ))
+                                        )),
+                                        createObjectType.apply(Map.of(
+                                                "name", Type.ANY,
+                                                "method", new Type.Function(List.of(), Type.ANY)
+                                        ))
+                                ),
+                                "method",
+                                List.of(),
+                                Type.ANY
+                        )
                 )
             )
         );
@@ -690,7 +1006,81 @@ final class AnalyzerTests {
                     ))),
                     new Ir.Stmt.Expression(new Ir.Expr.Function("main", List.of(), Type.ANY))
                 ))
+            ),
+            Arguments.of("Fizzbuzz 5",
+                    new Input.Program("""
+                    LET number = 5;
+                    LET mod3 = number / 3 * 3 == number;
+                    LET mod5 = number / 5 * 5 == number;
+                    IF mod3 AND mod5 DO
+                        print("FizzBuzz");
+                    ELSE 
+                        IF mod3 DO
+                            print("Fizz");
+                        ELSE   
+                            IF mod5 DO
+                                print("Buzz");
+                            ELSE
+                                print(number);
+                            END
+                        END
+                    END
+                """),
+                new Ir.Source(List.of(
+                        new Ir.Stmt.Let("number", Type.INTEGER, Optional.of(new Ir.Expr.Literal(new BigInteger("5"), Type.INTEGER))),
+
+                        new Ir.Stmt.Let("mod3", Type.BOOLEAN, Optional.of(
+                                new Ir.Expr.Binary("==",
+                                        new Ir.Expr.Binary("*",
+                                                new Ir.Expr.Binary("/",
+                                                        new Ir.Expr.Variable("number", Type.INTEGER),
+                                                        new Ir.Expr.Literal(new BigInteger("3"), Type.INTEGER),
+                                                        Type.INTEGER
+                                                ),
+                                                new Ir.Expr.Literal(new BigInteger("3"), Type.INTEGER),
+                                                Type.INTEGER
+                                        ),
+                                        new Ir.Expr.Variable("number", Type.INTEGER),
+                                        Type.BOOLEAN
+                                )
+                        )),
+
+                        new Ir.Stmt.Let("mod5", Type.BOOLEAN, Optional.of(
+                                new Ir.Expr.Binary("==",
+                                        new Ir.Expr.Binary("*",
+                                                new Ir.Expr.Binary("/",
+                                                        new Ir.Expr.Variable("number", Type.INTEGER),
+                                                        new Ir.Expr.Literal(new BigInteger("5"), Type.INTEGER),
+                                                        Type.INTEGER
+                                                ),
+                                                new Ir.Expr.Literal(new BigInteger("5"), Type.INTEGER),
+                                                Type.INTEGER
+                                        ),
+                                        new Ir.Expr.Variable("number", Type.INTEGER),
+                                        Type.BOOLEAN
+                                )
+                        )),
+
+                        new Ir.Stmt.If(
+                            new Ir.Expr.Binary("AND", new Ir.Expr.Variable("mod3", Type.BOOLEAN), new Ir.Expr.Variable("mod5", Type.BOOLEAN), Type.BOOLEAN),
+                            List.of(new Ir.Stmt.Expression(new Ir.Expr.Function("print", List.of(new Ir.Expr.Literal("FizzBuzz", Type.STRING)), Type.NIL))),
+                            List.of(
+                                    new Ir.Stmt.If(
+                                            new Ir.Expr.Variable("mod3", Type.BOOLEAN),
+                                            List.of(new Ir.Stmt.Expression(new Ir.Expr.Function("print", List.of(new Ir.Expr.Literal("Fizz", Type.STRING)), Type.NIL))),
+                                            List.of(
+                                                    new Ir.Stmt.If(
+                                                            new Ir.Expr.Variable("mod5", Type.BOOLEAN),
+                                                            List.of(new Ir.Stmt.Expression(new Ir.Expr.Function("print", List.of(new Ir.Expr.Literal("Buzz", Type.STRING)), Type.NIL))),
+                                                            List.of(new Ir.Stmt.Expression(new Ir.Expr.Function("print", List.of(new Ir.Expr.Variable("number", Type.INTEGER)), Type.NIL)))
+                                                    )
+                                            )
+                                    )
+                            )
+                        )
+                ))
             )
+
         );
     }
 
@@ -715,7 +1105,13 @@ final class AnalyzerTests {
             Arguments.of("Equatable Subtype", Type.STRING, Type.EQUATABLE, true),
             Arguments.of("Equatable Supertype", Type.ANY, Type.EQUATABLE, false),
             Arguments.of("Comparable Subtype", Type.STRING, Type.COMPARABLE, true),
-            Arguments.of("Comparable Non-Subtype", Type.NIL, Type.COMPARABLE, false)
+            Arguments.of("Comparable Non-Subtype", Type.NIL, Type.COMPARABLE, false),
+
+            Arguments.of("Comparable Equatable", Type.COMPARABLE, Type.EQUATABLE, true),
+            Arguments.of("Equatable Comparable", Type.EQUATABLE, Type.COMPARABLE, false),
+            Arguments.of("Iterable Comparable", Type.ITERABLE, Type.COMPARABLE, false),
+            Arguments.of("Iterable Equatable", Type.ITERABLE, Type.EQUATABLE, true)
+
         );
     }
 

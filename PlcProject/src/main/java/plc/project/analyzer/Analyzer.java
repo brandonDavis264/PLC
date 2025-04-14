@@ -1,6 +1,7 @@
 package plc.project.analyzer;
 
 import plc.project.evaluator.EvaluateException;
+import plc.project.evaluator.Evaluator;
 import plc.project.evaluator.RuntimeValue;
 import plc.project.parser.Ast;
 
@@ -91,30 +92,155 @@ public final class Analyzer implements Ast.Visitor<Ir, AnalyzeException> {
         // 2. Parameter types and the function's returns type must all be in Environment.TYPES;
             // not provided explicitly the type is Any.
         Set<String> uniqueNames = new HashSet<>();
+        List<Type> prameterTypes = new ArrayList<>();
+        List<Ir.Stmt.Def.Parameter> prameters = new ArrayList<>();
         for(int i = 0; i < ast.parameters().size(); i++) {
-            var type = Optional.of(Environment.TYPES.get(ast.parameterTypes().get(i)));
-//            var pramType = type.
-//                    or(() -> .map(expr -> expr.type())).
-//                    orElse(Type.ANY);
+            Type type;
             if(!uniqueNames.add(ast.parameters().get(i)))
                 throw new AnalyzeException("Function Definition Does not have unique parameters: " + ast.name() + "().");
+            if(ast.parameterTypes().get(i).isPresent()) {
+                if (Environment.TYPES.containsKey(ast.parameterTypes().get(i).get())) {
+                    type = Environment.TYPES.get(ast.parameterTypes().get(i).get());
+                } else {
+                    throw new AnalyzeException("Undefined type: " + ast.parameterTypes().get(i));
+                }
+            }else{
+                type = Type.ANY;
+            }
+            prameterTypes.add(type);
+            prameters.add(new Ir.Stmt.Def.Parameter(ast.parameters().get(i),type));
         }
-            return null;
+
+        //Return
+        Type returnType;
+        if(ast.returnType().isPresent()) {
+            if (Environment.TYPES.containsKey(ast.returnType().get())) {
+                returnType = Environment.TYPES.get(ast.returnType().get());
+            } else {
+                throw new AnalyzeException("Undefined type: " + ast.returnType());
+            }
+        }else{
+            returnType = Type.ANY;
+        }
+
+        scope.define(ast.name(), new Type.Function(prameterTypes, returnType));
+
+        //In a new child scope:
+        var parent = scope;
+        List<Ir.Stmt> body = new ArrayList<>();
+        try {
+            var child = new Scope(scope);
+            scope = child;
+            //1. Define variables for all parameters.
+            for (int j = 0; j < ast.parameters().size(); j++) {
+                child.define(ast.parameters().get(j), prameterTypes.get(j));
+            }
+            //2. Define the variable $RETURNS (which cannot be used as a variable in our language)
+            //      to store the return type (see Stmt.Return).
+            child.define("$RETURNS", returnType);
+
+            //3. Analyze all body statements sequentially.
+            for (var stmt : ast.body()) {
+                body.add(visit(stmt));
+            }
+        }finally {
+            scope = parent;
+        }
+        return new Ir.Stmt.Def(ast.name(), prameters, returnType, body);
     }
 
     @Override
     public Ir.Stmt.If visit(Ast.Stmt.If ast) throws AnalyzeException {
-        throw new UnsupportedOperationException("TODO"); //TODO
+        /** Analyzes an IF statement, with the following behavior:
+                1. Analyze the ast's condition, which must be a subtype of Boolean.
+                2. Analyze both the then/else bodies, each
+                    within their own new child scope.
+                        - Evaluation will only evaluate one, but for purposes of compilation
+                            we need to look at both!
+         **/
+        var condition = visit(ast.condition());
+        requireSubtype(condition.type(), Type.BOOLEAN);
+
+        var parent = scope;
+        List<Ir.Stmt> thenBody = new ArrayList<>();
+        List<Ir.Stmt> elseBody = new ArrayList<>();
+        try{
+            var child = new Scope(scope);
+            scope = child;
+
+            for(var stmt : ast.thenBody()){
+                thenBody.add(visit(stmt));
+            }
+        }finally {
+            scope = parent;
+        }
+
+        try{
+            var child = new Scope(scope);
+            scope = child;
+
+            for(var stmt : ast.elseBody()){
+                elseBody.add(visit(stmt));
+            }
+
+        }finally {
+            scope = parent;
+        }
+
+        return new Ir.Stmt.If(condition, thenBody, elseBody);
     }
 
     @Override
     public Ir.Stmt.For visit(Ast.Stmt.For ast) throws AnalyzeException {
-        throw new UnsupportedOperationException("TODO"); //TODO
+        /** 	Analyzes a FOR loop, with the following behavior:
+                    1. Analyze the ast's expression, which must be a
+                        subtype of Iterable.
+                    2. In a new child scope:
+                            1. Define the variable name to have type Integer
+                                (our language will require all Iterables to be of Integers).
+                            2. Analyze all body statements sequentially.
+         **/
+        var expression = visit(ast.expression());
+        requireSubtype(expression.type(), Type.ITERABLE);
+
+        var parent = scope;
+        List<Ir.Stmt> body = new ArrayList<>();
+        try {
+            var child = new Scope(scope);
+            scope = child;
+            scope.define(ast.name(), Type.INTEGER);
+            for(var stmt: ast.body()){
+                body.add(visit(stmt));
+            }
+        }finally {
+            scope = parent;
+        }
+
+        return new Ir.Stmt.For(ast.name(), Type.INTEGER, expression, body);
     }
 
     @Override
     public Ir.Stmt.Return visit(Ast.Stmt.Return ast) throws AnalyzeException {
-        throw new UnsupportedOperationException("TODO"); //TODO
+       /**	Analyzes a RETURN statement, with the following behavior:
+                1. Ensure the variable $RETURNS is defined (see DEF),
+                    which contains the expected return type.
+                2. If this variable isn't defined, it means we're returning outside of a function!
+                    Verify the type of the return value, which is Nil if absent,
+                    is a subtype of $RETURNS.
+        */
+       var returnType = scope.get("$RETURNS", true);
+
+       if(!returnType.isPresent()) {
+           throw new AnalyzeException("Return is Outside of the Function!!!");
+       }
+
+       Optional<Ir.Expr> value = ast.value().isPresent()
+                ? Optional.of(visit(ast.value().get()))
+                : Optional.empty();
+
+       requireSubtype(returnType.get(), value.get().type());
+
+        return new Ir.Stmt.Return(value);
     }
 
     @Override
@@ -130,8 +256,13 @@ public final class Analyzer implements Ast.Visitor<Ir, AnalyzeException> {
             var value = visit(ast.value());
             requireSubtype(value.type(), ir.type());
            return new Ir.Stmt.Assignment.Variable(ir, value);
+        }else if(ast.expression() instanceof Ast.Expr.Property property) {
+            var ir = visit(property);
+            var value = visit(ast.value());
+            requireSubtype(value.type(), ir.type());
+            return new Ir.Stmt.Assignment.Property(ir, value);
         }
-        throw new AnalyzeException("Write Messsage"); //TODO
+        throw new AnalyzeException("Not Variable or Property"); //TODO
     }
 
     private Ir.Expr visit(Ast.Expr ast) throws AnalyzeException {
@@ -212,26 +343,25 @@ public final class Analyzer implements Ast.Visitor<Ir, AnalyzeException> {
              * */
             case "<", "<=", ">", ">=": {
                 var left = visit(ast.left());
+                requireSubtype(left.type(), Type.COMPARABLE);
                 if(isComparable(left.type())) {
                     var right = visit(ast.right());
-                    requireSubtype(right.type(), left.type());  // or the other way around
-                    return new Ir.Expr.Binary(ast.operator(), left, right, Type.BOOLEAN);
-                }else
-                    throw new AnalyzeException("Not Equatable");
+                    if(right.type().equals(left.type()))
+                        return new Ir.Expr.Binary(ast.operator(), left, right, Type.BOOLEAN);
+                    else
+                        throw new AnalyzeException("Not of Same Type");
+                }
             }
             /** ==, !=
-             * The left operand must be a subtype of Comparable
-             * and the right must be the same type.
-             * The result is a Boolean.
+             * Both operands must be a subtype of Equatable.
+             * The result is a Boolean
              * */
             case "==", "!=": {
                 var left = visit(ast.left());
-                if(isEquatable(left.type())) {
-                    var right = visit(ast.right());
-                    requireSubtype(right.type(), left.type());  // or the other way around
-                    return new Ir.Expr.Binary(ast.operator(), left, right, Type.BOOLEAN);
-                }else
-                    throw new AnalyzeException("Not Equatable");
+                requireSubtype(left.type(), Type.EQUATABLE);
+                var right = visit(ast.right());
+                requireSubtype(right.type(), Type.EQUATABLE);  // or the other way around
+                return new Ir.Expr.Binary(ast.operator(), left, right, Type.BOOLEAN);
             }
             /** AND/OR:
              * Both operands must be a subtype of Boolean.
@@ -239,18 +369,14 @@ public final class Analyzer implements Ast.Visitor<Ir, AnalyzeException> {
              * */
             case "AND", "OR": {
                 var left = visit(ast.left());
-                if(left.type().equals(Type.BOOLEAN)) {
-                    var right = visit(ast.right());
-                    if(right.type().equals(left.type())) {
-                        return new Ir.Expr.Binary(ast.operator(), left, right, left.type());
-                    }else
-                        throw new AnalyzeException("Not same type as left");
-                }else
-                    throw new AnalyzeException("Not Boolean");
+                requireSubtype(left.type(), Type.BOOLEAN);
+                var right = visit(ast.right());
+                requireSubtype(right.type(), Type.BOOLEAN);
+                return new Ir.Expr.Binary(ast.operator(), left, right, left.type());
             }
 
         }
-        throw new AnalyzeException("TODO"); //TODO
+        throw new AnalyzeException("Not an Operation"); //TODO
     }
 
     @Override
@@ -286,13 +412,16 @@ public final class Analyzer implements Ast.Visitor<Ir, AnalyzeException> {
                     3. The expression type is the function type's return type.
          * */
         var functionType = scope.get(ast.name(), false)
-                .orElseThrow(() -> new AnalyzeException("Property '" + ast.name() + "' not found in object"));
+                .orElseThrow(() -> new AnalyzeException("Function '" + ast.name() + "' not found in scope"));
         if(functionType instanceof Type.Function type){
             List<Ir.Expr> args = new ArrayList<>();
-            for(int i = 0; i < ast.arguments().size(); i++) {
-                args.add(visit(ast.arguments().get(i)));
-                requireSubtype(args.get(i).type(), ((Type.Function) functionType).parameters().get(i));
-            }
+            if(type.parameters().size() == ast.arguments().size()) {
+                for (int i = 0; i < ast.arguments().size(); i++) {
+                    args.add(visit(ast.arguments().get(i)));
+                    requireSubtype(args.get(i).type(), ((Type.Function) functionType).parameters().get(i));
+                }
+            }else
+                throw new AnalyzeException("Function Argument Size Miss-Match");
             return new Ir.Expr.Function(ast.name(), args, ((Type.Function) functionType).returns());
         }else
             throw new AnalyzeException("Function " + ast.name() + " is not an instance of an Object"); //TODO
@@ -330,7 +459,122 @@ public final class Analyzer implements Ast.Visitor<Ir, AnalyzeException> {
 
     @Override
     public Ir.Expr.ObjectExpr visit(Ast.Expr.ObjectExpr ast) throws AnalyzeException {
-        throw new UnsupportedOperationException("TODO"); //TODO
+        /**	    Analyzes an object expression, with the following behavior:
+                    1. The name of the object must not be a type in
+                        Environment.TYPES.
+                    2. Analyze all fields, which must have unique names.
+                        The analysis follows the same semantics as LET statements,
+                        however should define the variable in the object's scope.
+                    3. Analyze all methods, which must have unique names
+                        (and are unique with fields as well). The analysis follows
+                        the same semantics as DEF statements, however should also
+                        define the variable this as an implicit parameter with the
+                        type of the object.
+                            - Important: Unlike methods at runtime, the "this" receiver
+                            is NOT part of Type.Function parameters.
+         **/
+        var objScope = new Type.Object(new Scope(null));
+        if (ast.name().isPresent()) {
+            String name = ast.name().get();
+            if (Environment.TYPES.containsKey(name)) {
+                throw new AnalyzeException("Invalid Object Name: '" + name + "' is a type.");
+            }
+            scope.define(name, objScope);
+        }
+
+        List<Ir.Stmt.Let> feilds = new ArrayList<>();
+        for(var feild: ast.fields()){
+            if(objScope.scope().get(feild.name(), true).isPresent()) {
+                throw new AnalyzeException("Feild " + ast.name() + " is already defined in scope");
+            }
+            Optional<Type> type = Optional.empty();
+            if(feild.type().isPresent()){
+                //This could be null
+                //Safe version
+                if(!Environment.TYPES.containsKey(feild.type().get())) {
+                    throw new AnalyzeException("Not Defined");
+                }
+                type = Optional.of(Environment.TYPES.get(feild.type().get()));
+            }
+            Optional<Ir.Expr> value = feild.value().isPresent()
+                    ? Optional.of(visit(feild.value().get()))
+                    : Optional.empty();
+
+            var variableType = type.
+                    or(() -> value.map(expr -> expr.type())).
+                    orElse(Type.ANY);
+            if(value.isPresent()) {
+                requireSubtype(value.get().type(), variableType);
+            }
+
+            objScope.scope().define(feild.name(), variableType);
+            feilds.add(new Ir.Stmt.Let(feild.name(), variableType, value));
+        }
+
+        List<Ir.Stmt.Def> methods = new ArrayList<>();
+        for(var method: ast.methods()){
+            if(objScope.scope().get(method.name(), true).isPresent()) {
+                throw new AnalyzeException("Method Name: " + ast.name() + " is already defined in scope");
+            }
+            // 1. Ensure names in parameters are unique.
+            // 2. Parameter types and the function's returns type must all be in Environment.TYPES;
+            // not provided explicitly the type is Any.
+            Set<String> uniqueNames = new HashSet<>();
+            List<Type> prameterTypes = new ArrayList<>();
+            List<Ir.Stmt.Def.Parameter> prameters = new ArrayList<>();
+            for(int i = 0; i < method.parameters().size(); i++) {
+                Type type;
+                if(!uniqueNames.add(method.parameters().get(i)))
+                    throw new AnalyzeException("Function Definition Does not have unique parameters: " + method.name() + "().");
+                if(method.parameterTypes().get(i).isPresent()) {
+                    if (Environment.TYPES.containsKey(method.parameterTypes().get(i).get())) {
+                        type = Environment.TYPES.get(method.parameterTypes().get(i).get());
+                    } else {
+                        throw new AnalyzeException("Undefined type: " + method.parameterTypes().get(i));
+                    }
+                }else{
+                    type = Type.ANY;
+                }
+                prameterTypes.add(type);
+                prameters.add(new Ir.Stmt.Def.Parameter(method.parameters().get(i),type));
+            }
+
+            //Return Type
+            Type returnType;
+            if(method.returnType().isPresent()) {
+                if (Environment.TYPES.containsKey(method.returnType().get())) {
+                    returnType = Environment.TYPES.get(method.returnType().get());
+                } else {
+                    throw new AnalyzeException("Undefined type: " + method.returnType());
+                }
+            }else{
+                returnType = Type.ANY;
+            }
+
+            objScope.scope().define(method.name(), new Type.Function(prameterTypes, returnType));
+            //In a new child scope:
+            var parent = objScope.scope();
+            List<Ir.Stmt> body = new ArrayList<>();
+
+            var child = new Scope(objScope.scope());
+            //1. Define variables for all parameters and implicit "this" parameter.
+            child.define("this", objScope);
+            for (int j = 0; j < method.parameters().size(); j++) {
+                child.define(method.parameters().get(j), prameterTypes.get(j));
+            }
+            //2. Define the variable $RETURNS (which cannot be used as a variable in our language)
+            //      to store the return type (see Stmt.Return).
+            child.define("$RETURNS", returnType);
+
+            //3. Analyze all body statements sequentially.
+            for (var stmt : method.body()) {
+                body.add(visit(stmt));
+            }
+
+            methods.add(new Ir.Stmt.Def(method.name(), prameters, returnType, body));
+        }
+
+        return new Ir.Expr.ObjectExpr(ast.name(), feilds, methods, objScope);
     }
 
     public static void requireSubtype(Type type, Type other) throws AnalyzeException {
