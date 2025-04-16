@@ -384,7 +384,7 @@ public final class Analyzer implements Ast.Visitor<Ir, AnalyzeException> {
         // Simlar to the  Evaluator
         // Look for variables in all scope:
         var type = scope.get(ast.name(), false) /// "var" is an optional type in Java!!!!
-                .orElseThrow(() -> new AnalyzeException("Variable " + ast.name() + "is not defined"));
+                .orElseThrow(() -> new AnalyzeException("Variable " + ast.name() + " is not defined"));
         return new Ir.Expr.Variable(ast.name(), type);
     }
 
@@ -512,66 +512,74 @@ public final class Analyzer implements Ast.Visitor<Ir, AnalyzeException> {
         }
 
         List<Ir.Stmt.Def> methods = new ArrayList<>();
-        for(var method: ast.methods()){
-            if(objScope.scope().get(method.name(), true).isPresent()) {
+        Optional<Type> returnType = Optional.empty();
+        List<Ir.Stmt.Def.Parameter> prameters = new ArrayList<>();
+        List<Type> prameterTypes = new ArrayList<>();
+        // Analyze All Function Prototypes
+        for(var method: ast.methods()) {
+            if (objScope.scope().get(method.name(), true).isPresent()) {
                 throw new AnalyzeException("Method Name: " + ast.name() + " is already defined in scope");
             }
             // 1. Ensure names in parameters are unique.
             // 2. Parameter types and the function's returns type must all be in Environment.TYPES;
             // not provided explicitly the type is Any.
             Set<String> uniqueNames = new HashSet<>();
-            List<Type> prameterTypes = new ArrayList<>();
-            List<Ir.Stmt.Def.Parameter> prameters = new ArrayList<>();
-            for(int i = 0; i < method.parameters().size(); i++) {
+            for (int i = 0; i < method.parameters().size(); i++) {
                 Type type;
-                if(!uniqueNames.add(method.parameters().get(i)))
+                if (!uniqueNames.add(method.parameters().get(i)))
                     throw new AnalyzeException("Function Definition Does not have unique parameters: " + method.name() + "().");
-                if(method.parameterTypes().get(i).isPresent()) {
+                if (method.parameterTypes().get(i).isPresent()) {
                     if (Environment.TYPES.containsKey(method.parameterTypes().get(i).get())) {
                         type = Environment.TYPES.get(method.parameterTypes().get(i).get());
                     } else {
                         throw new AnalyzeException("Undefined type: " + method.parameterTypes().get(i));
                     }
-                }else{
+                } else {
                     type = Type.ANY;
                 }
                 prameterTypes.add(type);
-                prameters.add(new Ir.Stmt.Def.Parameter(method.parameters().get(i),type));
+                prameters.add(new Ir.Stmt.Def.Parameter(method.parameters().get(i), type));
             }
 
             //Return Type
-            Type returnType;
-            if(method.returnType().isPresent()) {
+            if (method.returnType().isPresent()) {
                 if (Environment.TYPES.containsKey(method.returnType().get())) {
-                    returnType = Environment.TYPES.get(method.returnType().get());
+                    returnType = Optional.of(Environment.TYPES.get(method.returnType().get()));
                 } else {
                     throw new AnalyzeException("Undefined type: " + method.returnType());
                 }
-            }else{
-                returnType = Type.ANY;
+            } else {
+                returnType = Optional.of(Type.ANY);
             }
 
-            objScope.scope().define(method.name(), new Type.Function(prameterTypes, returnType));
-            //In a new child scope:
-            var parent = objScope.scope();
+            objScope.scope().define(method.name(), new Type.Function(prameterTypes, returnType.get()));
+        }
+        // Analyze Body
+        for(var method: ast.methods()){
+            // In a new child scope:
+            var enviormentScope = scope;
+            var methodScope = new Scope(objScope.scope());
             List<Ir.Stmt> body = new ArrayList<>();
+            try {
+                scope = methodScope;
+                //1. Define variables for all parameters and implicit "this" parameter.
+                scope.define("this", objScope);
+                for (int j = 0; j < method.parameters().size(); j++) {
+                    scope.define(method.parameters().get(j), prameterTypes.get(j));
+                }
+                //2. Define the variable $RETURNS (which cannot be used as a variable in our language)
+                //      to store the return type (see Stmt.Return).
+                scope.define("$RETURNS", returnType.get());
 
-            var child = new Scope(objScope.scope());
-            //1. Define variables for all parameters and implicit "this" parameter.
-            child.define("this", objScope);
-            for (int j = 0; j < method.parameters().size(); j++) {
-                child.define(method.parameters().get(j), prameterTypes.get(j));
+                //3. Analyze all body statements sequentially.
+                for (var stmt : method.body()) {
+                    body.add(visit(stmt));
+                }
+            }finally {
+                scope = enviormentScope;
             }
-            //2. Define the variable $RETURNS (which cannot be used as a variable in our language)
-            //      to store the return type (see Stmt.Return).
-            child.define("$RETURNS", returnType);
 
-            //3. Analyze all body statements sequentially.
-            for (var stmt : method.body()) {
-                body.add(visit(stmt));
-            }
-
-            methods.add(new Ir.Stmt.Def(method.name(), prameters, returnType, body));
+            methods.add(new Ir.Stmt.Def(method.name(), prameters, returnType.get(), body));
         }
 
         return new Ir.Expr.ObjectExpr(ast.name(), feilds, methods, objScope);

@@ -619,21 +619,21 @@ final class AnalyzerTests {
                     )
             ),
 
-                Arguments.of("Op== Equatable Subtype Left",
-                        new Input.Ast(
-                                new Ast.Expr.Binary(
-                                        "==",
-                                        new Ast.Expr.Variable("equatable"),
-                                        new Ast.Expr.Literal(new BigInteger("1"))
-                                )
-                        ),
-                        new Ir.Expr.Binary(
-                                "==",
-                                new Ir.Expr.Variable("equatable", Type.EQUATABLE),
-                                new Ir.Expr.Literal(new BigInteger("1"), Type.INTEGER),
-                                Type.BOOLEAN
-                        )
-                ),
+            Arguments.of("Op== Equatable Subtype Left",
+                    new Input.Ast(
+                            new Ast.Expr.Binary(
+                                    "==",
+                                    new Ast.Expr.Variable("equatable"),
+                                    new Ast.Expr.Literal(new BigInteger("1"))
+                            )
+                    ),
+                    new Ir.Expr.Binary(
+                            "==",
+                            new Ir.Expr.Variable("equatable", Type.EQUATABLE),
+                            new Ir.Expr.Literal(new BigInteger("1"), Type.INTEGER),
+                            Type.BOOLEAN
+                    )
+            ),
             Arguments.of("Op== Invalid Left Type",
                     new Input.Ast(
                             new Ast.Expr.Binary(
@@ -798,30 +798,33 @@ final class AnalyzerTests {
 
     private static Stream<Arguments> testMethodExpr() {
         return Stream.of(
-            Arguments.of("Method",
-                new Input.Ast(
-                    new Ast.Expr.Method(
-                        new Ast.Expr.Variable("object"),
-                        "methodAny",
-                        List.of(new Ast.Expr.Literal("argument"))
-                    )
+                Arguments.of("Method",
+                        new Input.Ast(
+                                new Ast.Expr.Method(
+                                        new Ast.Expr.Variable("object"),
+                                        "methodAny",
+                                        List.of(new Ast.Expr.Literal("argument"))
+                                )
+                        ),
+                        new Ir.Expr.Method(
+                                new Ir.Expr.Variable("object", Environment.scope().get("object", true).get()),
+                                "methodAny",
+                                List.of(new Ir.Expr.Literal("argument", Type.STRING)),
+                                Type.ANY
+                        )
                 ),
-                new Ir.Expr.Method(
-                    new Ir.Expr.Variable("object", Environment.scope().get("object", true).get()),
-                    "methodAny",
-                    List.of(new Ir.Expr.Literal("argument", Type.STRING)),
-                    Type.ANY
-                ),
+
                 Arguments.of("Invalid Receiver",
                         new Input.Ast(
                                 new Ast.Expr.Method(
-                                        new Ast.Expr.Literal(1),
+                                        new Ast.Expr.Literal(new BigInteger("1")),
                                         "method",
                                         List.of()
                                 )
                         ),
                         null // should throw AnalyzeException (e.g., requireSubtype fails)
                 ),
+
                 Arguments.of("Argument",
                         new Input.Ast(
                                 new Ast.Expr.Method(
@@ -837,8 +840,8 @@ final class AnalyzerTests {
                                 Type.ANY
                         )
                 )
-            )
         );
+
     }
 
     @ParameterizedTest
@@ -854,70 +857,74 @@ final class AnalyzerTests {
             return type;
         };
         return Stream.of(
-            Arguments.of("Empty",
-                new Input.Ast(
-                    new Ast.Expr.ObjectExpr(
-                        Optional.empty(),
-                        List.of(),
-                        List.of()
-                    )
-                ),
-                new Ir.Expr.ObjectExpr(
-                    Optional.empty(),
-                    List.of(),
-                    List.of(),
-                    createObjectType.apply(Map.of())
-                )
-            ),
-            Arguments.of("Field",
-                new Input.Ast(
-                    new Ast.Expr.Property(
-                        new Ast.Expr.ObjectExpr(
-                            Optional.empty(),
-                            List.of(new Ast.Stmt.Let("field", Optional.of(new Ast.Expr.Literal("value")))),
-                            List.of()
+                Arguments.of("Empty",
+                        new Input.Ast(
+                                new Ast.Expr.ObjectExpr(
+                                        Optional.empty(),
+                                        List.of(),
+                                        List.of()
+                                )
                         ),
-                        "field"
-                    )
+                        new Ir.Expr.ObjectExpr(
+                                Optional.empty(),
+                                List.of(),
+                                List.of(),
+                                createObjectType.apply(Map.of())
+                        )
                 ),
-                new Ir.Expr.Property(
-                    new Ir.Expr.ObjectExpr(
-                        Optional.empty(),
-                        List.of(new Ir.Stmt.Let("field", Type.STRING, Optional.of(new Ir.Expr.Literal("value", Type.STRING)))),
-                        List.of(),
-                        createObjectType.apply(Map.of("field", Type.STRING))
-                    ),
-                    "field",
-                    Type.STRING
-                )
-            ),
-            Arguments.of("Method",
-                new Input.Ast(
-                    new Ast.Expr.Method(
-                        new Ast.Expr.ObjectExpr(
-                            Optional.empty(),
-                            List.of(),
-                            List.of(new Ast.Stmt.Def(
+
+                Arguments.of("Field",
+                        new Input.Ast(
+                                new Ast.Expr.Property(
+                                        new Ast.Expr.ObjectExpr(
+                                                Optional.empty(),
+                                                List.of(new Ast.Stmt.Let("field", Optional.of(new Ast.Expr.Literal("value")))),
+                                                List.of()
+                                        ),
+                                        "field"
+                                )
+                        ),
+                        new Ir.Expr.Property(
+                                new Ir.Expr.ObjectExpr(
+                                        Optional.empty(),
+                                        List.of(new Ir.Stmt.Let("field", Type.STRING, Optional.of(new Ir.Expr.Literal("value", Type.STRING)))),
+                                        List.of(),
+                                        createObjectType.apply(Map.of("field", Type.STRING))
+                                ),
+                                "field",
+                                Type.STRING
+                        )
+                ),
+
+                Arguments.of("Method",
+                        new Input.Ast(
+                                new Ast.Expr.Method(
+                                        new Ast.Expr.ObjectExpr(
+                                                Optional.empty(),
+                                                List.of(),
+                                                List.of(new Ast.Stmt.Def(
+                                                        "method",
+                                                        List.of(),
+                                                        List.of()
+                                                ))
+                                        ),
+                                        "method",
+                                        List.of()
+                                )
+                        ),
+                        new Ir.Expr.Method(
+                                new Ir.Expr.ObjectExpr(
+                                        Optional.empty(),
+                                        List.of(),
+                                        List.of(new Ir.Stmt.Def("method", List.of(), Type.ANY, List.of())),
+                                        createObjectType.apply(Map.of("method", new Type.Function(List.of(), Type.ANY)))
+                                ),
                                 "method",
                                 List.of(),
-                                List.of()
-                            ))
-                        ),
-                        "method",
-                        List.of()
-                    )
+                                Type.ANY
+                        )
                 ),
-                new Ir.Expr.Method(
-                    new Ir.Expr.ObjectExpr(
-                        Optional.empty(),
-                        List.of(),
-                        List.of(new Ir.Stmt.Def("method", List.of(), Type.ANY, List.of())),
-                        createObjectType.apply(Map.of("method", new Type.Function(List.of(), Type.ANY)))
-                    ),
-                    "method",
-                    List.of(),
-                    Type.ANY
-                ),
+
                 Arguments.of("Duplicate Field",
                         new Input.Ast(
                                 new Ast.Expr.ObjectExpr(
@@ -931,27 +938,14 @@ final class AnalyzerTests {
                         ),
                         null // Expect AnalyzeException
                 ),
+
                 Arguments.of("Method This",
-                        new Input.Ast(
-                                new Ast.Expr.Method(
-                                        new Ast.Expr.ObjectExpr(
-                                                Optional.empty(),
-                                                List.of(new Ast.Stmt.Let("name", Optional.empty())),
-                                                List.of(new Ast.Stmt.Def(
-                                                        "method",
-                                                        List.of(),
-                                                        List.of(new Ast.Stmt.Expression(
-                                                                new Ast.Expr.Property(
-                                                                        new Ast.Expr.Variable("this"), // ← updated from Access to Property(Variable, name)
-                                                                        "name"
-                                                                )
-                                                        ))
-                                                ))
-                                        ),
-                                        "method",
-                                        List.of()
-                                )
-                        ),
+                        new Input.Program("""
+                            OBJECT DO
+                                LET name;
+                                DEF method() DO this.name; END
+                            END.method()
+                        """),
                         new Ir.Expr.Method(
                                 new Ir.Expr.ObjectExpr(
                                         Optional.empty(),
@@ -962,7 +956,10 @@ final class AnalyzerTests {
                                                 Type.ANY,
                                                 List.of(new Ir.Stmt.Expression(
                                                         new Ir.Expr.Property(
-                                                                new Ir.Expr.Variable("this", new Type.Object(new Scope(null))), // assuming you reconstruct 'this' type here
+                                                                new Ir.Expr.Variable("this", createObjectType.apply(Map.of(
+                                                                        "name", Type.ANY,
+                                                                        "method", new Type.Function(List.of(), Type.ANY)
+                                                                ))),
                                                                 "name",
                                                                 Type.ANY
                                                         )
@@ -977,9 +974,49 @@ final class AnalyzerTests {
                                 List.of(),
                                 Type.ANY
                         )
+                ),
+                Arguments.of("Forward Declaration (Bonus)",
+                        new Input.Program("""
+                            OBJECT DO
+                                DEF first() DO this.second(); END
+                                DEF second() DO END
+                            END
+                        """),
+                        new Ir.Expr.ObjectExpr(
+                                Optional.empty(),
+                                List.of(),
+                                List.of(
+                                        new Ir.Stmt.Def(
+                                                "first",
+                                                List.of(),
+                                                Type.ANY,
+                                                List.of(new Ir.Stmt.Expression(
+                                                        new Ir.Expr.Method(
+                                                                new Ir.Expr.Variable("this", createObjectType.apply(Map.of(
+                                                                        "first", new Type.Function(List.of(), Type.ANY),
+                                                                        "second", new Type.Function(List.of(), Type.ANY)
+                                                                ))),
+                                                                "second",
+                                                                List.of(),
+                                                                Type.ANY
+                                                        )
+                                                ))
+                                        ),
+                                        new Ir.Stmt.Def(
+                                                "second",
+                                                List.of(),
+                                                Type.ANY,
+                                                List.of()
+                                        )
+                                ),
+                                createObjectType.apply(Map.of(
+                                        "first", new Type.Function(List.of(), Type.ANY),
+                                        "second", new Type.Function(List.of(), Type.ANY)
+                                ))
+                        )
                 )
-            )
         );
+
     }
 
     @ParameterizedTest
