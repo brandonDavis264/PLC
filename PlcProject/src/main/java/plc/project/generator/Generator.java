@@ -61,7 +61,29 @@ public class Generator implements Ir.Visitor<StringBuilder, RuntimeException> {
 
     @Override
     public StringBuilder visit(Ir.Stmt.If ir) {
-        throw new UnsupportedOperationException("TODO"); //TODO
+//        builder.append("if (");
+//        visit(ir.condition());
+//        builder.append(") {");
+//        newline(++indent);
+//        for(int i = 0; i < ir.thenBody().size(); i++) {
+//            if(i == 0)
+//                newline(indent);
+//            visit(ir.thenBody().get(i));
+//        }
+//        newline(--indent);
+//        builder.append("}");
+//        if(!ir.elseBody().isEmpty()) {
+//            builder.append("else {");
+//            newline(++indent);
+//            for (int i = 0; i < ir.thenBody().size(); i++) {
+//                if (i == 0)
+//                    newline(indent);
+//                visit(ir.thenBody().get(i));
+//            }
+//            newline(--indent);
+//            builder.append("}");
+//        }
+        return builder;
     }
 
     @Override

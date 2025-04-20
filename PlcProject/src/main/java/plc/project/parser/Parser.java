@@ -113,7 +113,8 @@ public final class Parser {
                                         + (tokens.has(0) ? tokens.get(-2).literal() : "Empty" + tokens.get(-1).literal()));
                             }
                             pramaTypes.add(Optional.of(tokens.get(-1).literal()));
-                        }
+                        }//TODO: else pramaTypes.add(Optional.empty());
+                                // (Is the Size of the list of parameters always equal to the size of the paramterTypes in the AST def?)
                         //if we Match a ',' and peek for a ')'
                         if (tokens.match(",") && tokens.peek(")")) {
                             //Throw an error
