@@ -6,7 +6,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * IMPORTANT: DO NOT CHANGE! This file is part of the Analyzer API and should
+ * IMPORTANT: DO NOT CHANGE! This file is part of our project's API and should
  * not be modified by your solution.
  */
 public final class Scope {
