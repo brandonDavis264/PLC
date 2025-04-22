@@ -72,7 +72,31 @@ public class Generator implements Ir.Visitor<StringBuilder, RuntimeException> {
 
     @Override
     public StringBuilder visit(Ir.Stmt.Def ir) {
-        throw new UnsupportedOperationException("TODO"); //TODO
+        /**
+         * <ReturnType> <name>(<First> <first>, <Second> <second>, <Third> <third>, ...) {
+         *     <statements...>
+         * }
+         **/
+        builder.append(ir.returns().jvmName() + " " + ir.name() + "(");
+        for(int i = 0; i < ir.parameters().size(); i++){
+            builder.append(ir.parameters().get(i).type().jvmName()
+                    + " " + ir.parameters().get(i).name());
+            if(i < ir.parameters().size() - 1)
+                builder.append(", ");
+        }
+        builder.append(")");
+
+        //body
+        builder.append(" {");
+        ++indent;
+        for(var stamtment : ir.body()) {
+            newline(indent);
+            visit(stamtment);
+        }
+        newline(--indent);
+        builder.append("}");
+
+        return builder;
     }
 
     @Override
@@ -100,7 +124,6 @@ public class Generator implements Ir.Visitor<StringBuilder, RuntimeException> {
         return builder;
     }
 
-    //TODO: Test!
     @Override
     public StringBuilder visit(Ir.Stmt.For ir) {
         /**
@@ -123,7 +146,15 @@ public class Generator implements Ir.Visitor<StringBuilder, RuntimeException> {
 
     @Override
     public StringBuilder visit(Ir.Stmt.Return ir) {
-        throw new UnsupportedOperationException("TODO"); //TODO
+        //return null; (if value is empty)
+        if(ir.value().isPresent()) {
+            builder.append("return ");
+            visit(ir.value().get());
+            builder.append(";");
+        }else{
+            builder.append("return null;");
+        }
+        return builder;
     }
 
     @Override
@@ -135,12 +166,22 @@ public class Generator implements Ir.Visitor<StringBuilder, RuntimeException> {
 
     @Override
     public StringBuilder visit(Ir.Stmt.Assignment.Variable ir) {
-        throw new UnsupportedOperationException("TODO"); //TODO
+        //<variable> = <value>;
+        visit(ir.variable());
+        builder.append(" = ");
+        visit(ir.value());
+        builder.append(";");
+        return builder;
     }
 
     @Override
     public StringBuilder visit(Ir.Stmt.Assignment.Property ir) {
-        throw new UnsupportedOperationException("TODO"); //TODO
+        //<property> = <value>;
+        visit(ir.property());
+        builder.append(" = ");
+        visit(ir.value());
+        builder.append(";");
+        return builder;
     }
 
     @Override
@@ -162,12 +203,121 @@ public class Generator implements Ir.Visitor<StringBuilder, RuntimeException> {
 
     @Override
     public StringBuilder visit(Ir.Expr.Group ir) {
-        throw new UnsupportedOperationException("TODO"); //TODO
+        //(<expr>)
+        builder.append("(");
+        visit(ir.expression());
+        builder.append(")");
+        return builder;
     }
 
     @Override
     public StringBuilder visit(Ir.Expr.Binary ir) {
-        throw new UnsupportedOperationException("TODO"); //TODO
+        /***/
+        switch(ir.operator()){
+            case "+": {
+                if(ir.type().equals(Type.STRING)){
+                    visit(ir.left());
+                    builder.append(" + ");
+                    visit(ir.right());
+                }else{
+                    builder.append("(");
+                    visit(ir.left());
+                    builder.append(")");
+                    builder.append(".add(");
+                    visit(ir.right());
+                    builder.append(")");
+                }
+                break;
+            }
+            case "-": {
+                builder.append("(");
+                visit(ir.left());
+                builder.append(")");
+                builder.append(".subtract(");
+                visit(ir.right());
+                builder.append(")");
+                break;
+            }
+            case "*": {
+                builder.append("(");
+                visit(ir.left());
+                builder.append(")");
+                builder.append(".multiply(");
+                visit(ir.right());
+                builder.append(")");
+                break;
+            }
+            case "/": {
+                if(ir.type().equals(Type.INTEGER)){
+                    builder.append("(");
+                    visit(ir.left());
+                    builder.append(")");
+                    builder.append(".divide(");
+                    visit(ir.right());
+                    builder.append(")");
+                }else{
+                    builder.append("(");
+                    visit(ir.left());
+                    builder.append(")");
+                    builder.append(".divide(");
+                    visit(ir.right());
+                    builder.append(", RoundingMode.HALF_EVEN)");
+                }
+                break;
+            }
+            case "<", "<=", ">", ">=": {
+                //(<left>).compareTo(<right>) <op> 0
+                builder.append("(");
+                visit(ir.left());
+                builder.append(")");
+                builder.append(".compareTo(");
+                visit(ir.right());
+                builder.append(") " + ir.operator() + " 0");
+                break;
+            }
+            case "==": {
+                //Objects.equals(<left>, <right>)
+                builder.append("Objects.equals(");
+                visit(ir.left());
+                builder.append(", ");
+                visit(ir.right());
+                builder.append(")");
+                break;
+            }
+            case "!=": {
+                //!Objects.equals(<left>, <right>)
+                builder.append("!Objects.equals(");
+                visit(ir.left());
+                builder.append(", ");
+                visit(ir.right());
+                builder.append(")");
+                break;
+            }
+            case "AND": {
+                // If left is binary OR (<left>) && <right>
+                if(ir.left() instanceof Ir.Expr.Binary leftBin
+                        && leftBin.operator().equals("OR")){
+                    builder.append("(");
+                    visit(ir.left());
+                    builder.append(") && ");
+                    visit(ir.right());
+
+                }else {
+                    // <left> && <right>
+                    visit(ir.left());
+                    builder.append(" && ");
+                    visit(ir.right());
+                }
+                break;
+            }
+            case "OR": {
+                visit(ir.left());
+                builder.append(" || ");
+                visit(ir.right());
+                break;
+            }
+        }
+        return builder;
     }
 
     @Override
@@ -178,18 +328,48 @@ public class Generator implements Ir.Visitor<StringBuilder, RuntimeException> {
 
     @Override
     public StringBuilder visit(Ir.Expr.Property ir) {
+        //<receiver>.<name>
+        visit(ir.receiver());
         builder.append("." + ir.name());
         return builder;
     }
 
     @Override
     public StringBuilder visit(Ir.Expr.Function ir) {
-        throw new UnsupportedOperationException("TODO"); //TODO
+        /**
+         * <name>()
+         * <name>(<argument>)
+         * <name>(<first>, <second>, <third>, ...)
+         * */
+        builder.append(ir.name());
+        builder.append("(");
+        for(int i = 0; i < ir.arguments().size(); i++){
+            visit(ir.arguments().get(i));
+            if(i < ir.arguments().size() - 1)
+                builder.append(", ");
+        }
+        builder.append(")");
+        return builder;
     }
 
     @Override
     public StringBuilder visit(Ir.Expr.Method ir) {
-        throw new UnsupportedOperationException("TODO"); //TODO
+        /**
+         * <receiver>.<name>()
+         * <receiver>.<name>(<argument>)
+         * <receiver>.<name>(<first>, <second>, <third>, ...)
+         * */
+        visit(ir.receiver());
+        builder.append(".");
+        builder.append(ir.name());
+        builder.append("(");
+        for(int i = 0; i < ir.arguments().size(); i++){
+            visit(ir.arguments().get(i));
+            if(i < ir.arguments().size() - 1)
+                builder.append(", ");
+        }
+        builder.append(")");
+        return builder;
     }
 
     @Override
