@@ -489,7 +489,7 @@ final class ParserTests {
                                 new Token(Token.Type.IDENTIFIER, "DO"),
                                 new Token(Token.Type.IDENTIFIER, "END")
                         )),
-                        new Ast.Stmt.Def("name", List.of("parameter1", "parameter2", "parameter3"), List.of(Optional.of("identifier"), Optional.of("identifier")), Optional.empty(), List.of())
+                        new Ast.Stmt.Def("name", List.of("parameter1", "parameter2", "parameter3"), List.of(Optional.of("identifier"), Optional.empty(), Optional.of("identifier")), Optional.empty(), List.of())
                 ),
 
                 //Parameters with incorrect types
