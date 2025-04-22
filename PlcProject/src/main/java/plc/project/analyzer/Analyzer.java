@@ -137,7 +137,7 @@ public final class Analyzer implements Ast.Visitor<Ir, AnalyzeException> {
             }
             //2. Define the variable $RETURNS (which cannot be used as a variable in our language)
             //      to store the return type (see Stmt.Return).
-            child.define("$RETURNS", returnType);
+            scope.define("$RETURNS", returnType);
 
             //3. Analyze all body statements sequentially.
             for (var stmt : ast.body()) {
@@ -228,9 +228,9 @@ public final class Analyzer implements Ast.Visitor<Ir, AnalyzeException> {
                     Verify the type of the return value, which is Nil if absent,
                     is a subtype of $RETURNS.
         */
-       var returnType = scope.get("$RETURNS", true);
+       var returnType = scope.get("$RETURNS", false);
 
-       if(!returnType.isPresent()) {
+       if(returnType.isEmpty()) {
            throw new AnalyzeException("Return is Outside of the Function!!!");
        }
 

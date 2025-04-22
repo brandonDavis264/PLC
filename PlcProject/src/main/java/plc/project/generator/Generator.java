@@ -374,7 +374,26 @@ public class Generator implements Ir.Visitor<StringBuilder, RuntimeException> {
 
     @Override
     public StringBuilder visit(Ir.Expr.ObjectExpr ir) {
-        throw new UnsupportedOperationException("TODO"); //TODO
+        /**
+         * new Object() {
+         *   <fields...>
+         *   <methods...>
+         * }
+         * */
+        builder.append("new Object() {");
+        ++indent;
+        for(var fields: ir.fields()) {
+            newline(indent);
+            visit(fields);
+        }
+        for(var method: ir.methods()) {
+            newline(indent);
+            visit(method);
+        }
+        --indent;
+        newline(indent);
+        builder.append("}");
+        return builder;
     }
 
 }
