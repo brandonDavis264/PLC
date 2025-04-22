@@ -51,7 +51,23 @@ public class Generator implements Ir.Visitor<StringBuilder, RuntimeException> {
 
     @Override
     public StringBuilder visit(Ir.Stmt.Let ir) {
-        throw new UnsupportedOperationException("TODO"); //TODO
+        /**<Type> <name>;
+         <Type> <name> = <value>;
+         var <name> = <value>; (if Type is an instanceof Type.Object, to allow proper type inference in Java)
+         * */
+        if(ir.type() instanceof Type.Object){
+            builder.append("var " + ir.name());
+        }else
+            builder.append(ir.type().jvmName() + " " + ir.name());
+
+        if(ir.value().isPresent()) {
+            builder.append(" = ");
+            visit(ir.value().get());
+        }
+
+        builder.append(";");
+
+        return builder; //TODO
     }
 
     @Override
@@ -61,34 +77,48 @@ public class Generator implements Ir.Visitor<StringBuilder, RuntimeException> {
 
     @Override
     public StringBuilder visit(Ir.Stmt.If ir) {
-//        builder.append("if (");
-//        visit(ir.condition());
-//        builder.append(") {");
-//        newline(++indent);
-//        for(int i = 0; i < ir.thenBody().size(); i++) {
-//            if(i == 0)
-//                newline(indent);
-//            visit(ir.thenBody().get(i));
-//        }
-//        newline(--indent);
-//        builder.append("}");
-//        if(!ir.elseBody().isEmpty()) {
-//            builder.append("else {");
-//            newline(++indent);
-//            for (int i = 0; i < ir.thenBody().size(); i++) {
-//                if (i == 0)
-//                    newline(indent);
-//                visit(ir.thenBody().get(i));
-//            }
-//            newline(--indent);
-//            builder.append("}");
-//        }
+        builder.append("if (");
+        visit(ir.condition());
+        builder.append(") {");
+        ++indent;
+        for(int i = 0; i < ir.thenBody().size(); i++) {
+            newline(indent);
+            visit(ir.thenBody().get(i));
+        }
+        newline(--indent);
+        builder.append("}");
+        if(!ir.elseBody().isEmpty()) {
+            builder.append(" else {");
+            ++indent;
+            for (int i = 0; i < ir.thenBody().size(); i++) {
+                newline(indent);
+                visit(ir.elseBody().get(i));
+            }
+            newline(--indent);
+            builder.append("}");
+        }
         return builder;
     }
 
+    //TODO: Test!
     @Override
     public StringBuilder visit(Ir.Stmt.For ir) {
-        throw new UnsupportedOperationException("TODO"); //TODO
+        /**
+         * for (<Type> <name> : <expression>) {
+         *     <statements...> (separated by newlines)
+         * }
+         * */
+        builder.append("for (" + ir.type().jvmName() + " " + ir.name() + " : ");
+        visit(ir.expression());
+        builder.append(") {");
+        ++indent;
+        for(var statement : ir.body()) {
+            newline(indent);
+            visit(statement);
+        }
+        newline(--indent);
+        builder.append("}");
+        return builder;
     }
 
     @Override
@@ -142,12 +172,14 @@ public class Generator implements Ir.Visitor<StringBuilder, RuntimeException> {
 
     @Override
     public StringBuilder visit(Ir.Expr.Variable ir) {
-        throw new UnsupportedOperationException("TODO"); //TODO
+        builder.append(ir.name());
+        return builder;
     }
 
     @Override
     public StringBuilder visit(Ir.Expr.Property ir) {
-        throw new UnsupportedOperationException("TODO"); //TODO
+        builder.append("." + ir.name());
+        return builder;
     }
 
     @Override
