@@ -117,11 +117,10 @@ public final class Parser {
                             pramaTypes.add(Optional.empty());
                                 // (Is the Size of the list of parameters always equal to the size of the paramterTypes in the AST def?)
                         //if we Match a ',' and peek for a ')'
-                        if (tokens.match(",") && tokens.peek(")")) {
+                        if(tokens.peek(",", ")") || !tokens.match(",") && !tokens.peek(")") ) {
                             //Throw an error
                             throw new ParseException("Parser Error: Expected Argument found: "
                                     + (tokens.has(0) ? tokens.get(-1).literal() : "Empty"));
-
                         }
                     }else
                         throw new ParseException("Parser Error: Expected Argument found: "
@@ -329,7 +328,7 @@ public final class Parser {
                         //BAD SEEMS LIKE THIS IS GOING TO BE A LLOOOOOONNNG DEBUGGING SECTION HERE :/
 
                         //if we Match a ',' and peek for a ')'
-                        if(tokens.match(",") && tokens.peek(")")) {
+                        if(tokens.peek(",", ")") || !tokens.match(",") && !tokens.peek(")") ) {
                             //Throw an error
                             throw new ParseException("Parser Error: Expected Argument found: "
                                     + (tokens.has(0) ? tokens.get(-1).literal() : "Empty"));
@@ -464,7 +463,7 @@ public final class Parser {
         //object_expr ::= 'OBJECT' identifier? 'DO' let_stmt* def_stmt* 'END'
         tokens.match("OBJECT");
         Optional<String> name = Optional.empty();
-        if(!tokens.peek("DO")) {
+        if(tokens.peek(Token.Type.IDENTIFIER, "DO")) {
             tokens.match(Token.Type.IDENTIFIER);
             name = Optional.of(tokens.get(-1).literal());
         }

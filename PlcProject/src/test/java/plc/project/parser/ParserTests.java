@@ -481,7 +481,9 @@ final class ParserTests {
                                 new Token(Token.Type.IDENTIFIER, "parameter1"),
                                 new Token(Token.Type.OPERATOR, ":"),
                                 new Token(Token.Type.IDENTIFIER, "identifier"),
+                                new Token(Token.Type.OPERATOR, ","),
                                 new Token(Token.Type.IDENTIFIER, "parameter2"),
+                                new Token(Token.Type.OPERATOR, ","),
                                 new Token(Token.Type.IDENTIFIER, "parameter3"),
                                 new Token(Token.Type.OPERATOR, ":"),
                                 new Token(Token.Type.IDENTIFIER, "identifier"),
@@ -511,6 +513,22 @@ final class ParserTests {
                         )),
                         null
                 ),
+
+                //Parameter inccorect Type syntax
+                Arguments.of("Missing Parameter :",
+                        new Input.Tokens(List.of(
+                                new Token(Token.Type.IDENTIFIER, "DEF"),
+                                new Token(Token.Type.IDENTIFIER, "name"),
+                                new Token(Token.Type.OPERATOR, "("),
+                                new Token(Token.Type.IDENTIFIER, "parameter1"),
+                                new Token(Token.Type.IDENTIFIER, "type"),
+                                new Token(Token.Type.OPERATOR, ")"),
+                                new Token(Token.Type.IDENTIFIER, "DO"),
+                                new Token(Token.Type.IDENTIFIER, "END")
+                        )),
+                        null
+                ),
+
 
                 //Parameter inccorect Type syntax
                 Arguments.of("Incorrect Parameter type Syntax",
@@ -641,6 +659,21 @@ final class ParserTests {
                                 new Token(Token.Type.IDENTIFIER, "END")
                         )),
                         null // Expected ParseException
+                ),
+
+
+                Arguments.of("Missing Comma",
+                        new Input.Tokens(List.of(
+                                new Token(Token.Type.IDENTIFIER, "DEF"),
+                                new Token(Token.Type.IDENTIFIER, "name"),
+                                new Token(Token.Type.OPERATOR, "("),
+                                new Token(Token.Type.IDENTIFIER, "param1"),
+                                new Token(Token.Type.IDENTIFIER, "param2"), // Comma without a following parameter
+                                new Token(Token.Type.OPERATOR, ")"),
+                                new Token(Token.Type.IDENTIFIER, "DO"),
+                                new Token(Token.Type.IDENTIFIER, "END")
+                        )),
+                        null
                 ),
 
                 // Test for missing function name
@@ -1617,6 +1650,18 @@ final class ParserTests {
                                     new Ast.Expr.Variable("x2")
                         ))
                 ),
+                Arguments.of("Missing Coma",
+                        new Input.Tokens(List.of(
+                                new Token(Token.Type.IDENTIFIER, "reciever"),
+                                new Token(Token.Type.OPERATOR, "."),
+                                new Token(Token.Type.IDENTIFIER, "function"),
+                                new Token(Token.Type.OPERATOR, "("),
+                                new Token(Token.Type.IDENTIFIER, "x1"),
+                                new Token(Token.Type.IDENTIFIER, "x2"),
+                                new Token(Token.Type.OPERATOR, ")")
+                        )),
+                        null
+                ),
                 Arguments.of("Multiple Argument 3",
                         new Input.Tokens(List.of(
                                 new Token(Token.Type.IDENTIFIER, "reciever"),
@@ -1818,6 +1863,20 @@ final class ParserTests {
                         null // Expected ParseException
                 ),
 
+                Arguments.of("Name DO",
+                        new Input.Tokens(List.of(
+                                new Token(Token.Type.IDENTIFIER, "OBJECT"),
+                                new Token(Token.Type.IDENTIFIER, "DO"),
+                                new Token(Token.Type.IDENTIFIER, "DO"),
+                                new Token(Token.Type.IDENTIFIER, "END")
+                        )),
+                        new Ast.Expr.ObjectExpr(
+                                Optional.of("DO"),
+                                List.of(),
+                                List.of()
+                        )
+                ),
+
                 // Test missing END keyword (should fail)
                 Arguments.of("Missing END",
                         new Input.Tokens(List.of(
@@ -1828,7 +1887,7 @@ final class ParserTests {
                                 new Token(Token.Type.OPERATOR, ";")
                                 // Missing "END"
                         )),
-                        null // Expected ParseException
+                        null
                 ),
 
                 // Test object expression with identifier
