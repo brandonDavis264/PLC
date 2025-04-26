@@ -213,6 +213,22 @@ final class EvaluatorTests {
                     new RuntimeValue.Primitive(null),
                     List.of(new RuntimeValue.Primitive(new BigInteger("1")), new RuntimeValue.Primitive(new BigInteger("2"))) // x should remain 10 after function call
             ),
+                Arguments.of("Missing Argument",
+                        new Input.Program("""
+                        DEF name(parameter) DO END
+                        name();
+                        """),
+                        null,
+                        List.of() // x should remain 10 after function call
+                ),
+                Arguments.of("Extraneous Argument",
+                        new Input.Program("""
+                        DEF name(parameter) DO END
+                        name("argument", "extraneous");
+                        """),
+                        null,
+                        List.of() // x should remain 10 after function call
+                ),
             Arguments.of("Static Scoping",
                     new Input.Program("""
                     LET x = 1;
@@ -226,7 +242,7 @@ final class EvaluatorTests {
                     outer();
                     """),
                     new RuntimeValue.Primitive(null),
-                    List.of(new RuntimeValue.Primitive(new BigInteger("42"))) // x should remain 10 after function call
+                    List.of(new RuntimeValue.Primitive(new BigInteger("42")))
             ),
             Arguments.of("PER SPEC: Static Scoping",
                     new Input.Program("""
@@ -385,8 +401,7 @@ final class EvaluatorTests {
                             new RuntimeValue.Primitive(new BigInteger("1")),
                             new RuntimeValue.Primitive(new BigInteger("2")),
                             new RuntimeValue.Primitive(new BigInteger("3")),
-                            new RuntimeValue.Primitive(new BigInteger("4")),
-                            new RuntimeValue.Primitive(new BigInteger("5"))
+                            new RuntimeValue.Primitive(new BigInteger("4"))
                     )
             ),
             Arguments.of("Not an iterable expression",

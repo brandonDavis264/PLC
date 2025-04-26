@@ -104,10 +104,14 @@ public final class Evaluator implements Ast.Visitor<RuntimeValue, EvaluateExcept
             scope = functionScope;
             // Define variables for all parameters to the values in arguments,
                 // ensuring the correct number of arguments is passed.
-            for(int i = 0; i < ast.parameters().size(); ++i) {
-                String name = ast.parameters().get(i);
-                scope.define(name, lambdaArguments.get(i));
-            }
+            if(lambdaArguments.size() == ast.parameters().size()) {
+                for (int i = 0; i < ast.parameters().size(); ++i) {
+                    String name = ast.parameters().get(i);
+                    scope.define(name, lambdaArguments.get(i));
+                }
+            }else
+                throw new EvaluateException("Function Requires: " + ast.parameters().size() + " Parameter(s)");
+            
             RuntimeValue returnStatement = new RuntimeValue.Primitive(null);
             // Evaluate the body statements sequentially.
             try {

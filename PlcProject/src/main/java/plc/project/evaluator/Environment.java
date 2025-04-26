@@ -78,7 +78,7 @@ public final class Environment {
                 primMax.value() instanceof BigInteger max &&
                 primMin.value() instanceof BigInteger min) {
             List<RuntimeValue> range = new ArrayList<>();
-            for (var i = min.intValueExact(); i <= max.intValueExact(); i++) {
+            for (var i = min.intValueExact(); i < max.intValueExact(); i++) {
                 range.add(new RuntimeValue.Primitive(min));
                 min = min.add(BigInteger.ONE);
             }

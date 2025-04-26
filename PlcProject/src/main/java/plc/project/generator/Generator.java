@@ -114,7 +114,7 @@ public class Generator implements Ir.Visitor<StringBuilder, RuntimeException> {
         if(!ir.elseBody().isEmpty()) {
             builder.append(" else {");
             ++indent;
-            for (int i = 0; i < ir.thenBody().size(); i++) {
+            for (int i = 0; i < ir.elseBody().size(); i++) {
                 newline(indent);
                 visit(ir.elseBody().get(i));
             }
