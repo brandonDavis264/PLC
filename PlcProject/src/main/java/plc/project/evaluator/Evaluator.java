@@ -209,7 +209,10 @@ public final class Evaluator implements Ast.Visitor<RuntimeValue, EvaluateExcept
             scope = elementScope;
             try {
                 // Verify that the element is a RuntimeValue
-                requireType((RuntimeValue) element, RuntimeValue.class);
+                if(!(element instanceof RuntimeValue)){
+                    throw new EvaluateException("Not a RuntimeValue");
+                }
+
                 // Define a variable name with the value of the element.
                 scope.define(ast.name(), (RuntimeValue) element);
                 // Evaluate body statements sequentially.
@@ -240,6 +243,8 @@ public final class Evaluator implements Ast.Visitor<RuntimeValue, EvaluateExcept
         RuntimeValue value = null;
         if (ast.value().isPresent())
             value = visit(ast.value().get());
+        else
+            value = new RuntimeValue.Primitive(null);
         // This Statement Will be brought up to the function definition
         throw new Return(value);
     }
@@ -444,23 +449,21 @@ public final class Evaluator implements Ast.Visitor<RuntimeValue, EvaluateExcept
                 (note this is not the standard equals method -
                 check the Javadocs for details).
              */
-            case "==":{
+            case "==", "!=":{
                 var left = visit(ast.left());
                 var right = visit(ast.right());
 
-                var primativeLeft = requireType(left, RuntimeValue.Primitive.class).value();
-                var primativeRight = requireType(right, RuntimeValue.Primitive.class).value();
+                if(left instanceof RuntimeValue.Primitive && right instanceof RuntimeValue.Primitive) {
+                    var primativeLeft = requireType(left, RuntimeValue.Primitive.class).value();
+                    var primativeRight = requireType(right, RuntimeValue.Primitive.class).value();
+                    return new RuntimeValue.Primitive(Objects.equals(primativeLeft, primativeRight));
+                }else if(left instanceof RuntimeValue.ObjectValue && right instanceof RuntimeValue.ObjectValue) {
+                    var objLeft = requireType(left, RuntimeValue.ObjectValue.class);
+                    var objRight = requireType(right, RuntimeValue.ObjectValue.class);
+                    return new RuntimeValue.Primitive(Objects.equals(objLeft, objRight));
+                }
 
-                return new RuntimeValue.Primitive(Objects.equals(primativeLeft, primativeRight));
-            }
-            case "!=":{
-                var left = visit(ast.left());
-                var right = visit(ast.right());
 
-                var primativeLeft = requireType(left, RuntimeValue.Primitive.class).value();
-                var primativeRight = requireType(right, RuntimeValue.Primitive.class).value();
-
-                return new RuntimeValue.Primitive(!Objects.equals(primativeLeft, primativeRight));
             }
             /**
                 </<=/>/>=: The left operand must be Comparable,
@@ -612,7 +615,7 @@ public final class Evaluator implements Ast.Visitor<RuntimeValue, EvaluateExcept
         var objectValReceiver = requireType(receiver, RuntimeValue.ObjectValue.class);
         // 2. Ensure that the variable name is defined by the receiver.
             // Retrieve the property from the receiver’s scope, not the global scope
-        var binding = objectValReceiver.scope().get(ast.name(),false);
+        var binding = objectValReceiver.scope().get(ast.name(),true);
         // 3. Return the variable value.
         return binding.orElseThrow(() -> new EvaluateException("Undefined Variable: " + ast.name() + "."));
     }
@@ -707,7 +710,7 @@ public final class Evaluator implements Ast.Visitor<RuntimeValue, EvaluateExcept
          * 		        even if an exception is thrown.
          */
 
-        //Creat an Object value with:
+        // Creat an Object value with:
             //1. The name is the same as the AST.
             //2. The scope is a new child of the current scope.
         Scope currScope = scope;
@@ -747,7 +750,8 @@ public final class Evaluator implements Ast.Visitor<RuntimeValue, EvaluateExcept
                 var methodDefinition = new RuntimeValue.Function(method.name(), (arguments) -> {
                     // Within a new scope that is a child of the scope where the object
                     // was defined
-                    Scope methodScope = new Scope(objScope);
+                    Scope methodScope = new Scope(currScope);
+                    Scope prevScope = scope;
                     scope = methodScope;
                     // Define the variable this to be the method receiver,
                     // which is passed as the first argument.
@@ -756,9 +760,12 @@ public final class Evaluator implements Ast.Visitor<RuntimeValue, EvaluateExcept
                     // Define variables for all parameters to the corresponding
                     // values in arguments, ensuring the correct number
                     // of arguments is passed.
-                    for (int i = 0; i < method.parameters().size(); i++) {
-                        scope.define(method.parameters().get(i), arguments.get(i + 1));
-                    }
+                    if((method.parameters().size()+1) == arguments.size()) {
+                        for (int i = 0; i < method.parameters().size(); i++) {
+                            scope.define(method.parameters().get(i), arguments.get(i + 1));
+                        }
+                    }else
+                        throw new EvaluateException("Function Requires: " + method.parameters().size() + " Parameter(s)");
                     // Evaluate the body statements sequentially.
                     RuntimeValue returnStatement = new RuntimeValue.Primitive(null);
                     try {
@@ -770,12 +777,12 @@ public final class Evaluator implements Ast.Visitor<RuntimeValue, EvaluateExcept
                             returnStatement = returnedValue.value;
                         }
                     }finally {
-                        System.out.println("\nIn Scope: " + scope.toString() + ".\nRestoring to: " + currScope + ".\n");
-                        scope = objScope;
+                        System.out.println("\nIn Scope: " + scope.toString() + ".\nRestoring to: " + prevScope + ".\n");
+                        scope = prevScope;
                     }
                     // Return the value resulting from RETURN,
                     // if present, or else NIL
-                    scope = objScope;
+
                     return returnStatement;
                 });
                 scope.define(method.name(), methodDefinition);
@@ -784,15 +791,6 @@ public final class Evaluator implements Ast.Visitor<RuntimeValue, EvaluateExcept
             System.out.println("\nIn Scope: " + scope.toString() + ".\nRestoring to: " + currScope + ".\n");
             scope = currScope;
         }
-        /*catch(EvaluateException e) {
-            // Ensure the current scope is restored to the original scope,
-             // even if an exception is thrown.
-            System.out.println(e.getMessage() + "\nIn Scope: " + scope + ".\nRestoring to: " + currScope + ".\n");
-            scope = currScope;
-            return obj;
-        }
-        //Returns an ObjectValue
-        scope = currScope;*/
         return obj;
     }
 

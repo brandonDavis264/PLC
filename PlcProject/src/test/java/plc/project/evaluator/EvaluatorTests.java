@@ -436,6 +436,7 @@ final class EvaluatorTests {
                     //Should Not log X
                     List.of()
             ),
+
             Arguments.of("Scope Exit Restored",
                     new Input.Program("""
                     LET scope = "outer";
@@ -450,7 +451,19 @@ final class EvaluatorTests {
                     List.of(new RuntimeValue.Primitive("inner"),
                             new RuntimeValue.Primitive("inner"),
                             new RuntimeValue.Primitive("outer"))
+            ),
+            Arguments.of("Invalid Iterable Element",
+                    new Input.Ast(new Ast.Source(List.of(
+                            new Ast.Stmt.For(
+                                    "element",
+                                    new Ast.Expr.Literal(List.of("Java String, not RuntimeValue")),
+                                    List.of(new Ast.Stmt.Expression(new Ast.Expr.Function("log", List.of(new Ast.Expr.Variable("element")))))
+                            )
+                    ))),
+                    null,
+                    List.of()
             )
+
         );
 
 
@@ -493,6 +506,29 @@ final class EvaluatorTests {
                 ))),
                 null, //EvaluateException
                 List.of()
+            ),
+            Arguments.of("Return",
+                    new Input.Program("""
+                    DEF F() DO 
+                        RETURN;
+                    END
+                    F();
+                    """
+                    ),
+                    new RuntimeValue.Primitive(null), //EvaluateException
+                    List.of()
+            ),
+            Arguments.of("Control FLow",
+                    new Input.Program("""
+                    DEF function() DO
+                        RETURN;
+                        log("unevaluated");
+                    END
+                    function();
+                    """
+                    ),
+                    new RuntimeValue.Primitive(null), //EvaluateException
+                    List.of()
             )
         );
     }
@@ -806,6 +842,13 @@ final class EvaluatorTests {
                     List.of( new RuntimeValue.Primitive(new BigInteger("1")),
                             new RuntimeValue.Primitive(new BigInteger("0")))
             ),
+            Arguments.of("Op/ Integer Divide By Zero Log",
+                    new Input.Program("""
+                    object == object
+                    """),
+                    new RuntimeValue.Primitive(true),
+                    List.of()
+            ),
             Arguments.of("Op/ Decimal Rounding Up",
                     new Input.Program("""
                     2.3 / 2.0;
@@ -1062,8 +1105,60 @@ final class EvaluatorTests {
                 ),
                 new RuntimeValue.Primitive("argument"),
                 List.of()
-            )
+            ),
+            //ADD TESTS
+            Arguments.of("Direct Field Access",
+                    new Input.Program("""
+                    OBJECT DO
+                        LET field = "field";
+                        DEF name() DO
+                            log(field);
+                            NIL;
+                        END
+                    END.name()
+                    """),
+                    null,
+                    List.of()
+            ),
 
+            Arguments.of("This Parent Access (Spec Error)",
+                    new Input.Program("""
+                    OBJECT DO
+                        DEF name() DO
+                            log(this.variable);
+                            NIL;
+                        END
+                    END.name()
+                    """),
+                    null,
+                    List.of()
+            ),
+
+            Arguments.of("Missing Argument",
+                    new Input.Program("""
+                    OBJECT DO
+                        DEF name(parameter) DO
+                            log(parameter);
+                            NIL;
+                        END
+                    END.name()
+                    """),
+                    null,
+                    List.of()
+            ),
+
+            Arguments.of("Extraneous Argument",
+                    new Input.Program("""
+                    OBJECT DO
+                        DEF name(parameter) DO
+                            log(parameter);
+                            NIL;
+                        END
+                    END.name("argument", "extraneous")
+                    """),
+                    null,
+                    List.of()
+            )
         );
     }
 
@@ -1193,8 +1288,51 @@ final class EvaluatorTests {
                     new RuntimeValue.Primitive("This a function: DEF function(?) DO ? END"),
                     List.of(new RuntimeValue.Primitive("This is an Object: Object(Object) { property = `property`, method = `DEF method(?) DO ? END` }"),
                             new RuntimeValue.Primitive("This a function: DEF function(?) DO ? END")) // x should remain 10 after function call
-            )
-        );
+            ),
+                Arguments.of("FizzBuzz 1-15 Loop",
+                        new Input.Program("""
+                        DEF fizzbuzz(number) DO
+                            LET mod3 = number / 3 * 3 == number;
+                            LET mod5 = number / 5 * 5 == number;
+                            IF mod3 AND mod5 DO
+                                log("FizzBuzz");
+                            ELSE
+                                IF mod3 DO
+                                    log("Fizz");
+                                ELSE
+                                    IF mod5 DO
+                                        log("Buzz");
+                                    ELSE
+                                        log("" + number);
+                                    END
+                                END
+                            END
+                        END
+                        FOR i IN range(1, 16) DO
+                            fizzbuzz(i);
+                        END
+                    """),
+                        new RuntimeValue.Primitive(null),
+                        List.of(
+                                new RuntimeValue.Primitive("1"),
+                                new RuntimeValue.Primitive("2"),
+                                new RuntimeValue.Primitive("Fizz"),
+                                new RuntimeValue.Primitive("4"),
+                                new RuntimeValue.Primitive("Buzz"),
+                                new RuntimeValue.Primitive("Fizz"),
+                                new RuntimeValue.Primitive("7"),
+                                new RuntimeValue.Primitive("8"),
+                                new RuntimeValue.Primitive("Fizz"),
+                                new RuntimeValue.Primitive("Buzz"),
+                                new RuntimeValue.Primitive("11"),
+                                new RuntimeValue.Primitive("Fizz"),
+                                new RuntimeValue.Primitive("13"),
+                                new RuntimeValue.Primitive("14"),
+                                new RuntimeValue.Primitive("FizzBuzz")
+                        )
+                )
+
+                );
     }
 
     interface ParserMethod<T extends Ast> {
