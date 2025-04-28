@@ -333,8 +333,56 @@ final class AnalyzerTests {
                             new Ast.Stmt.Expression(new Ast.Expr.Function("name", List.of()))
                     ))),
                     null // AnalyzeException due to type mismatch (expected String, got Integer)
-            )
+            ),
+            //Create Tesets for:
+                //Return Subtype (2): DEF name() DO RETURN; END
+                    // Unexpected exception (java.util.NoSuchElementException: No value present)
+                Arguments.of("Return Subtype",
+                        new Input.Ast(new Ast.Source(List.of(
+                                new Ast.Stmt.Def("name", List.of(), List.of(), Optional.empty(), List.of(
+                                        new Ast.Stmt.Return(Optional.empty())
+                                )),
+                                new Ast.Stmt.Expression(new Ast.Expr.Function("name", List.of()))
+                        ))),
+                        new Ir.Source(List.of(
+                                new Ir.Stmt.Def("name", List.of(), Type.ANY, List.of(
+                                        new Ir.Stmt.Return(Optional.empty())
+                                )),
+                                new Ir.Stmt.Expression(new Ir.Expr.Function("name", List.of(), Type.ANY))
+                        ))
 
+                ),
+                //Return Non-Subtype (2): DEF name(): String DO RETURN; END
+                    // Unexpected exception (java.util.NoSuchElementException: No value present)
+                Arguments.of("Return Non-Subtype",
+                        new Input.Ast(new Ast.Source(List.of(
+                                new Ast.Stmt.Def("name", List.of(), List.of(), Optional.of("String"), List.of(
+                                        new Ast.Stmt.Return(Optional.empty())
+                                )),
+                                new Ast.Stmt.Expression(new Ast.Expr.Function("name", List.of()))
+                        ))),
+                        null
+                ),
+                //Value Subtype (2): DEF name() DO RETURN "value"; END
+                    // Unexpected AnalyzeException
+                    //`Type Primitive[name=Any, jvmName=Object] is not a subtype of Primitive[name=String, jvmName=String]` thrown, expected
+                        // IR `Def[name=name, parameters=[], returns=Primitive[name=Any, jvmName=Object],
+                            // body=[Return[value=Optional[Literal[value=value, type=Primitive[name=String, jvmName=String]]]]]]`.
+                Arguments.of("Value Subtype",
+                        new Input.Ast(new Ast.Source(List.of(
+                                new Ast.Stmt.Def("name", List.of(), List.of(), Optional.empty(), List.of(
+                                        new Ast.Stmt.Return(Optional.of(new Ast.Expr.Literal("value")))
+                                )),
+                                new Ast.Stmt.Expression(new Ast.Expr.Function("name", List.of()))
+                        ))),
+                        new Ir.Source(List.of(
+                                new Ir.Stmt.Def("name", List.of(), Type.ANY, List.of(
+                                        new Ir.Stmt.Return(Optional.of(new Ir.Expr.Literal("value", Type.STRING)))
+                                )),
+                                new Ir.Stmt.Expression(new Ir.Expr.Function("name", List.of(), Type.ANY))
+                        ))
+
+                )
         );
     }
 
@@ -670,7 +718,22 @@ final class AnalyzerTests {
                             )
                     ),
                     null // AnalyzeException (Invalid right type: object cannot be equated with equatable)
-            )
+            ),
+            //Comparable Left (0/1): comparable <= 1
+                //Expected an AnalyzeException to be thrown, received
+                    //`Binary[operator=<=, left=Variable[name=comparable, type=Primitive[name=Comparable, jvmName=Comparable]],
+                        // right=Literal[value=1, type=Primitive[name=Integer, jvmName=BigInteger]],
+                        // type=Primitive[name=Boolean, jvmName=boolean]]`.
+                Arguments.of("Comparable Left",
+                        new Input.Ast(
+                                new Ast.Expr.Binary(
+                                        "<=",
+                                        new Ast.Expr.Variable("comparable"),
+                                        new Ast.Expr.Literal(new BigInteger("1"))
+                                )
+                        ),
+                        null
+                )
         );
     }
 
@@ -839,6 +902,26 @@ final class AnalyzerTests {
                                 List.of(new Ir.Expr.Literal("argument", Type.STRING)),
                                 Type.ANY
                         )
+                ),
+                Arguments.of("Missing Argument",
+                        new Input.Ast(
+                                new Ast.Expr.Method(
+                                        new Ast.Expr.Variable("object"),
+                                        "methodAny",
+                                        List.of()
+                                )
+                        ),
+                        null
+                ),
+                Arguments.of("Extraneous Argument",
+                        new Input.Ast(
+                                new Ast.Expr.Method(
+                                        new Ast.Expr.Variable("object"),
+                                        "method",
+                                        List.of(new Ast.Expr.Literal("any"))
+                                )
+                        ),
+                        null
                 )
         );
 
@@ -1014,7 +1097,18 @@ final class AnalyzerTests {
                                         "second", new Type.Function(List.of(), Type.ANY)
                                 ))
                         )
+                ),
+
+                Arguments.of("Direct Field Access",
+                        new Input.Program("""
+                            OBJECT DO
+                                LET field;
+                                DEF name() DO field; END
+                            END
+                        """),
+                        null // Expect AnalyzeException
                 )
+
         );
 
     }
@@ -1027,6 +1121,48 @@ final class AnalyzerTests {
 
     public static Stream<Arguments> testProgram() {
         return Stream.of(
+            Arguments.of("Object Field Access",
+                new Input.Program("""
+                    LET obj = OBJECT DO
+                        LET name;
+                    END;
+                    obj.name;
+                """),
+                new Ir.Source(List.of(
+                        new Ir.Stmt.Let(
+                                "obj",
+                                new Type.Object(new Scope(null)),
+                                Optional.of(
+                                        new Ir.Expr.ObjectExpr(
+                                                Optional.empty(),
+                                                List.of(
+                                                        new Ir.Stmt.Let("name", Type.ANY, Optional.empty())
+                                                ),
+                                                List.of(),
+                                                new Type.Object(new Scope(null))
+                                        )
+                                )
+                        ),
+                        new Ir.Stmt.Expression(
+                                new Ir.Expr.Property(
+                                        new Ir.Expr.Variable(
+                                                "obj",
+                                                new Type.Object(new Scope(null))
+                                        ),
+                                        "name",
+                                        Type.ANY
+                                )
+                        )
+                    ))
+                ),
+
+                Arguments.of("No Scope Usage",
+                    new Input.Program("""
+                        OBJECT Name DO END;
+                        Name;
+                    """),
+                    null // Expect AnalyzeException
+            ),
             Arguments.of("Hello World",
                 //Input.Program makes tests *significantly* easier, but relies
                 //on your Lexer and Parser being implemented correctly!

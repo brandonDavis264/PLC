@@ -238,7 +238,11 @@ public final class Analyzer implements Ast.Visitor<Ir, AnalyzeException> {
                 ? Optional.of(visit(ast.value().get()))
                 : Optional.empty();
 
-       requireSubtype(returnType.get(), value.get().type());
+       if(value.isPresent())
+           requireSubtype(value.get().type(), returnType.get());
+       else {
+           requireSubtype(Type.NIL, returnType.get());
+       }
 
         return new Ir.Stmt.Return(value);
     }
@@ -294,7 +298,6 @@ public final class Analyzer implements Ast.Visitor<Ir, AnalyzeException> {
         return new Ir.Expr.Group(exp);
     }
 
-
     @Override
     public Ir.Expr.Binary visit(Ast.Expr.Binary ast) throws AnalyzeException {
         //Analyzes a binary expression, with the following behavior:
@@ -344,13 +347,11 @@ public final class Analyzer implements Ast.Visitor<Ir, AnalyzeException> {
             case "<", "<=", ">", ">=": {
                 var left = visit(ast.left());
                 requireSubtype(left.type(), Type.COMPARABLE);
-                if(isComparable(left.type())) {
-                    var right = visit(ast.right());
-                    if(right.type().equals(left.type()))
-                        return new Ir.Expr.Binary(ast.operator(), left, right, Type.BOOLEAN);
-                    else
-                        throw new AnalyzeException("Not of Same Type");
-                }
+                var right = visit(ast.right());
+                if(right.type().equals(left.type()))
+                    return new Ir.Expr.Binary(ast.operator(), left, right, Type.BOOLEAN);
+                else
+                    throw new AnalyzeException("Not of Same Type");
             }
             /** ==, !=
              * Both operands must be a subtype of Equatable.
@@ -396,7 +397,7 @@ public final class Analyzer implements Ast.Visitor<Ir, AnalyzeException> {
          */
         var receiver = visit(ast.receiver());
         if(receiver.type() instanceof Type.Object objectType) {
-            var propertyType = objectType.scope().get(ast.name(), false)
+            var propertyType = objectType.scope().get(ast.name(), true)
                     .orElseThrow(() -> new AnalyzeException("Property '" + ast.name() + "' not found in object"));
             return new Ir.Expr.Property(receiver, ast.name(), propertyType);
         }else
@@ -446,10 +447,13 @@ public final class Analyzer implements Ast.Visitor<Ir, AnalyzeException> {
                     .orElseThrow(() -> new AnalyzeException("Property '" + ast.name() + "' not found in object"));
             if(methodType instanceof Type.Function type){
                 List<Ir.Expr> args = new ArrayList<>();
-                for(int i = 0; i < ast.arguments().size(); i++) {
-                    args.add(visit(ast.arguments().get(i)));
-                    requireSubtype(args.get(i).type(), ((Type.Function) methodType).parameters().get(i));
-                }
+                if(type.parameters().size() == ast.arguments().size()) {
+                    for (int i = 0; i < ast.arguments().size(); i++) {
+                        args.add(visit(ast.arguments().get(i)));
+                        requireSubtype(args.get(i).type(), ((Type.Function) methodType).parameters().get(i));
+                    }
+                }else
+                    throw new AnalyzeException("Function Argument Size Miss-Match");
                 return new Ir.Expr.Method(receiver, ast.name(), args, ((Type.Function) methodType).returns());
             }else
                 throw new AnalyzeException("Function " + ast.name() + " is not an instance of an function type"); //TODO
@@ -479,7 +483,6 @@ public final class Analyzer implements Ast.Visitor<Ir, AnalyzeException> {
             if (Environment.TYPES.containsKey(name)) {
                 throw new AnalyzeException("Invalid Object Name: '" + name + "' is a type.");
             }
-            scope.define(name, objScope);
         }
 
         List<Ir.Stmt.Let> feilds = new ArrayList<>();
@@ -558,7 +561,7 @@ public final class Analyzer implements Ast.Visitor<Ir, AnalyzeException> {
         for(var method: ast.methods()){
             // In a new child scope:
             var enviormentScope = scope;
-            var methodScope = new Scope(objScope.scope());
+            var methodScope = new Scope(enviormentScope);
             List<Ir.Stmt> body = new ArrayList<>();
             try {
                 scope = methodScope;
