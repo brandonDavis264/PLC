@@ -449,7 +449,7 @@ public final class Evaluator implements Ast.Visitor<RuntimeValue, EvaluateExcept
                 (note this is not the standard equals method -
                 check the Javadocs for details).
              */
-            case "==", "!=":{
+            case "==":{
                 var left = visit(ast.left());
                 var right = visit(ast.right());
 
@@ -461,6 +461,20 @@ public final class Evaluator implements Ast.Visitor<RuntimeValue, EvaluateExcept
                     var objLeft = requireType(left, RuntimeValue.ObjectValue.class);
                     var objRight = requireType(right, RuntimeValue.ObjectValue.class);
                     return new RuntimeValue.Primitive(Objects.equals(objLeft, objRight));
+                }
+            }
+            case "!=":{
+                var left = visit(ast.left());
+                var right = visit(ast.right());
+
+                if(left instanceof RuntimeValue.Primitive && right instanceof RuntimeValue.Primitive) {
+                    var primativeLeft = requireType(left, RuntimeValue.Primitive.class).value();
+                    var primativeRight = requireType(right, RuntimeValue.Primitive.class).value();
+                    return new RuntimeValue.Primitive(!Objects.equals(primativeLeft, primativeRight));
+                }else if(left instanceof RuntimeValue.ObjectValue && right instanceof RuntimeValue.ObjectValue) {
+                    var objLeft = requireType(left, RuntimeValue.ObjectValue.class);
+                    var objRight = requireType(right, RuntimeValue.ObjectValue.class);
+                    return new RuntimeValue.Primitive(!Objects.equals(objLeft, objRight));
                 }
 
 

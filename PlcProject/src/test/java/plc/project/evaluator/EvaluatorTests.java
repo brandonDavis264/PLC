@@ -863,6 +863,20 @@ final class EvaluatorTests {
                         null,
                         List.of()
             ),
+            Arguments.of("Decimal Not Equals True",
+                    new Input.Program("""
+                    1.0 != 2.0
+                    """),
+                    new RuntimeValue.Primitive(true),
+                    List.of()
+            ),
+            Arguments.of("String Not Equals False",
+                    new Input.Program("""
+                    "string" != "string"
+                    """),
+                    new RuntimeValue.Primitive(false),
+                    List.of()
+            ),
             Arguments.of("Group Expression Operation: PEMDAS",
                     new Input.Program("""
                     log(log((log(1) + log(4))) / log((log(2) + log(3))));

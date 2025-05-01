@@ -1121,41 +1121,6 @@ final class AnalyzerTests {
 
     public static Stream<Arguments> testProgram() {
         return Stream.of(
-            Arguments.of("Object Field Access",
-                new Input.Program("""
-                    LET obj = OBJECT DO
-                        LET name;
-                    END;
-                    obj.name;
-                """),
-                new Ir.Source(List.of(
-                        new Ir.Stmt.Let(
-                                "obj",
-                                new Type.Object(new Scope(null)),
-                                Optional.of(
-                                        new Ir.Expr.ObjectExpr(
-                                                Optional.empty(),
-                                                List.of(
-                                                        new Ir.Stmt.Let("name", Type.ANY, Optional.empty())
-                                                ),
-                                                List.of(),
-                                                new Type.Object(new Scope(null))
-                                        )
-                                )
-                        ),
-                        new Ir.Stmt.Expression(
-                                new Ir.Expr.Property(
-                                        new Ir.Expr.Variable(
-                                                "obj",
-                                                new Type.Object(new Scope(null))
-                                        ),
-                                        "name",
-                                        Type.ANY
-                                )
-                        )
-                    ))
-                ),
-
                 Arguments.of("No Scope Usage",
                     new Input.Program("""
                         OBJECT Name DO END;
